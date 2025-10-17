@@ -1,11 +1,13 @@
 #include "utils.hpp"
 
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 using namespace utils;
 
 int main() {
+
     int *p = alloc<int>();
     assert(p != NULL);
     *p = 5;
@@ -20,6 +22,42 @@ int main() {
     assert(q[0] == 5);
     assert(q[1] == 8);
     assert(p[0] == 5);
+
+    auto u0 = Unique<int>(alloc<int>(), 1);
+    int *u0_ptr = u0.ptr;
+    assert(u0.ptr != nullptr);
+    auto u1 = std::move(u0);
+    assert(u0.ptr == nullptr);
+    assert(u1.ptr == u0_ptr);
+    u1.destroy();
+    assert(u1.ptr == nullptr);
+
+    auto s0 = Shared<int>(alloc<int>(), 1);
+    assert(s0.ptr != nullptr);
+    assert(*s0.count == 1);
+
+    auto s1 = s0;
+    assert(s0.ptr == s1.ptr);
+    assert(s1.ptr != nullptr);
+
+    assert(*s0.count == *s1.count);
+    assert(*s1.count == 2);
+
+    s1.destroy();
+
+    assert(s0.ptr == s1.ptr);
+    assert(s1.ptr != nullptr);
+
+    assert(*s0.count == *s1.count);
+    assert(*s1.count == 1);
+
+    s1.destroy();
+
+    assert(*s0.count == *s1.count);
+    assert(*s0.count == 0);
+
+    // assert(*s1.count == *s0.count);
+    /// assert(*s1.count == 1);
 
     // auto zero = Slice<int>();
     // assert(zero.items == nullptr);

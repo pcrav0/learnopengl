@@ -3,18 +3,30 @@
 #include <cstdbool>
 #include <cstddef>
 #include <cstdint>
-
+#include <cstdlib>
 #include <cstring>
 
-#include <initializer_list>
+#include <utility>
 
 #ifndef UTILS_PROC
-#define UTILS_PROC inline constexpr
+#define UTILS_PROC inline
 #endif
 
 #ifndef UTILS_ASSERT
 #include <assert.h>
 #define UTILS_ASSERT assert
+#endif
+
+#ifndef UTILS_BREAKPOINT
+#define UTILS_BREAKPOINT() __asm__("int3")
+#endif
+
+#ifndef UTILS_PROC_INIT
+#define UTILS_PROC_INIT __attribute__((constructor))
+#endif
+
+#ifndef UTILS_PROC_FINI
+#define UTILS_PROC_FINI __attribute__((destructor))
 #endif
 
 namespace utils {
@@ -85,6 +97,10 @@ template <typename T> UTILS_PROC void swap(T &a, T &b) {
     b = tmp;
 }
 
+template <typename T> UTILS_PROC void copy(T *src, T *dest) {
+    memcpy(static_cast<T *>(dest), static_cast<T *>(src), sizeof(T));
+}
+
 template <typename T> struct Maybe {
     T value;
     bool has;
@@ -122,6 +138,8 @@ struct Allocator {
     virtual void reset() = 0;
 };
 
+Allocator *global_allocator = nullptr;
+
 template <typename T> struct Slice {
     T *items;
     usize length;
@@ -130,27 +148,28 @@ template <typename T> struct Slice {
 
     UTILS_PROC Slice(T *items, usize length) : items{items}, length{length} {}
 
-    UTILS_PROC Slice(std::initializer_list<T> values)
-        : items{(T *)(values.begin())}, length{values.size()} {}
+    // UTILS_PROC Slice(std::initializer_list<T> values)
+    //     : items{(T *)(values.begin())}, length{values.size()} {}
 
     UTILS_PROC T &at(ssize index) const {
         if (index < 0)
             index += length;
 
-        UTILS_ASSERT(index >= 0);
-        // UTILS_ASSERT(index < length);
+        // UTILS_ASSERT(index >= 0);
+        //  UTILS_ASSERT(index < length);
         UTILS_ASSERT(items != nullptr);
         return items[index];
     }
 
     UTILS_PROC T &operator[](usize index) const { return at(index); }
 
-    UTILS_PROC Slice<T> &splice(ssize start, ssize end) const {
-        UTILS_ASSERT(mod<ssize>(end, length) > mod<ssize>(start, length));
-        UTILS_ASSERT(start < length);
-        UTILS_ASSERT(end < length);
+    UTILS_PROC Slice<T> splice(ssize start, ssize end) const {
+        // UTILS_ASSERT(mod<ssize>(end, (length + 1)) >
+        //              mod<ssize>(start, (length + 1)));
+        // UTILS_ASSERT(start <= length);
+        // UTILS_ASSERT(end <= length);
 
-        return Slice<T>(at(start), end - start);
+        return Slice<T>(&at(start), end - start);
     }
 
     UTILS_PROC void swap(ssize a, ssize b) {
@@ -191,11 +210,53 @@ template <typename T> struct Array {
     UTILS_PROC Array(T *items, usize length)
         : items{items}, length{0}, capacity{length} {}
 
-    UTILS_PROC Array(std::initializer_list<T> values)
-        : items{const_cast<T *>(values.begin())}, length{values.size()} {}
+    // UTILS_PROC Array(std::initializer_list<T> values)
+    //     : items{const_cast<T *>(values.begin())}, length{values.size()} {}
 
     UTILS_PROC T &at(ssize index) const { return slice.at(index); }
     UTILS_PROC T &operator[](usize index) const { return at(index); }
+
+    UTILS_PROC void rotate(ssize n) { slice.rotate(n); }
+
+    UTILS_PROC Slice<T> splice(ssize start, ssize end) const {
+        return slice.splice(start, end);
+    }
+
+    UTILS_PROC void reserve(usize increment,
+                            Allocator *allocator = global_allocator) {
+        if (items == NULL) {
+            capacity = increment;
+            items = alloc<T>(capacity, allocator);
+            return;
+        }
+
+        usize old_size = capacity;
+        capacity += increment;
+        usize new_size = capacity;
+        items = realloc<T>(items, old_size, new_size, allocator);
+    }
+
+    UTILS_PROC void insert(T item, usize index,
+                           Allocator *allocator = global_allocator) {
+        UTILS_ASSERT(index <= length);
+
+        if (capacity == 0) {
+            reserve(1, allocator);
+        } else if (length >= capacity) {
+            reserve(capacity, allocator);
+        }
+
+        length += 1;
+        at(-1) = item;
+
+        if ((length - 1) != index) {
+            splice(index, length).rotate(1);
+        }
+    }
+
+    UTILS_PROC void push(T item, Allocator *allocator = global_allocator) {
+        insert(item, length, allocator);
+    }
 };
 
 template <typename T> struct List {
@@ -232,18 +293,19 @@ template <usize N> struct Allocator_Static : Allocator {
     Slice<u8> pool;
     usize used;
 
-    Allocator_Static() {
-        pool = Slice<u8>(new u8[N], N);
-        used = 0;
-    }
+    Allocator_Static()
+        : pool{Slice<u8>(reinterpret_cast<u8 *>(std::malloc(N)), N)}, used{0} {}
 
     UTILS_PROC void *run(void *ptr, usize old_size, usize new_size) override {
-        // dealloc
-        if (new_size == 0)
-            return nullptr;
+        UTILS_ASSERT((used + new_size) <= N);
 
-        // alloc
-        void *result = &pool.at(used);
+        // dealloc
+        if (new_size == 0) {
+            return nullptr;
+        }
+
+        // allocxs
+        void *result = &pool[used];
         used += new_size;
 
         // realloc
@@ -253,74 +315,150 @@ template <usize N> struct Allocator_Static : Allocator {
         return result;
     }
 
-    UTILS_PROC void destroy() override { delete[] pool.items; }
+    UTILS_PROC void destroy() override {
+        if (pool.items == nullptr)
+            return;
+
+        std::free(pool.items);
+    }
+
     UTILS_PROC void reset() override { used = 0; }
 };
 
-struct Context {
-    Allocator *allocator;
-    // logger
-    // dynamic library pointer
-    // stdout, stdin, stderr
-
-    Context(Allocator *allocator) : allocator{allocator} {}
-};
-
-// my own dynamic scope
-struct Environment {
-    static Environment *instance;
-
-    Array<Context> contexts;
-    Allocator_Static<1024 * 8> fallback;
-
-    // Environment() {};
-    Environment(Environment &) = delete;
-    void operator=(const Environment &) = delete;
-};
-
-static Context *context();
-
 template <typename T>
-UTILS_PROC T *alloc(uint count = 1,
-                    Allocator *allocator = context()->allocator) {
-    // return static_cast<T *>(allocator->run(nullptr, 0, sizeof(T) * count));
-    return (T *)(allocator->run(nullptr, 0, sizeof(T) * count));
+UTILS_PROC T *alloc(uint count = 1, Allocator *allocator = global_allocator) {
+    UTILS_ASSERT(allocator != nullptr);
+    return static_cast<T *>(allocator->run(nullptr, 0, sizeof(T) * count));
 }
 
 template <typename T>
 UTILS_PROC void dealloc(T *ptr, uint count,
-                        Allocator *allocator = context()->allocator) {
+                        Allocator *allocator = global_allocator) {
+    UTILS_ASSERT(allocator != nullptr);
     allocator->run(ptr, sizeof(T) * count, 0);
 }
 
 template <typename T>
 UTILS_PROC T *realloc(T *ptr, uint old_count, uint new_count,
-                      Allocator *allocator = context()->allocator) {
+                      Allocator *allocator = global_allocator) {
+    UTILS_ASSERT(allocator != nullptr);
     return static_cast<T *>(
         allocator->run(ptr, sizeof(T) * old_count, sizeof(T) * new_count));
 }
 
-static Context *context() {
-    if (Environment::instance == nullptr) {
-        static u8 instance_memory[sizeof(Environment)] = {0};
-        Environment::instance =
-            reinterpret_cast<Environment *>(instance_memory);
+template <typename T> struct Unique {
+    T *ptr;
+    usize ptr_count;
+    Allocator *allocator;
 
-        Environment::instance->fallback = Allocator_Static<1024 * 8>();
+    UTILS_PROC Unique(T *ptr, usize ptr_count,
+                      Allocator *allocator = global_allocator)
+        : ptr{ptr}, ptr_count{ptr_count}, allocator{allocator} {}
 
-        Environment::instance->contexts =
-            Array<Context>((Context *)Environment::instance->fallback.run(
-                               nullptr, 0, sizeof(Context)),
-                           1);
+    UTILS_PROC Unique(const Unique &other) = delete;
 
-        Environment::instance->contexts[0] =
-            Context(new Allocator_Static<1024 * 8>());
-        Environment::instance->contexts.length = 1;
+    UTILS_PROC Unique(Unique &&other)
+        : ptr{other.ptr}, ptr_count{other.ptr_count},
+          allocator{other.allocator} {
+        other.destroy();
     }
 
-    return &Environment::instance->contexts[-1];
+    UTILS_PROC Unique &operator=(const Unique &other) = delete;
+
+    UTILS_PROC Unique &operator=(const Unique &&other) {
+        dealloc(ptr, allocator);
+
+        ptr = other.ptr;
+        ptr_count = other.ptr_count;
+        allocator = other.allocator;
+
+        return *this;
+    }
+
+    UTILS_PROC void destroy() {
+        if (ptr == nullptr || ptr_count == 0)
+            return;
+
+        dealloc(ptr, ptr_count, allocator);
+
+        ptr = nullptr;
+        ptr_count = 0;
+        allocator = nullptr;
+    }
+
+    UTILS_PROC ~Unique() { destroy(); }
+};
+
+template <typename T> struct Shared {
+    T *ptr;
+    usize ptr_count;
+    Allocator *allocator;
+    usize *count;
+
+    UTILS_PROC Shared(T *ptr, usize ptr_count,
+                      Allocator *allocator = global_allocator)
+        : ptr{ptr}, ptr_count{ptr_count}, allocator{allocator},
+          count{alloc<usize>(1, allocator)} {
+        *count = 1;
+    }
+
+    UTILS_PROC Shared(Shared &other)
+        : ptr{other.ptr}, allocator{other.allocator}, count{other.count} {
+        (*other.count)++;
+    }
+
+    UTILS_PROC Shared(Shared &&other)
+        : ptr{ptr}, allocator{allocator}, count{count} {
+        other.destroy();
+    }
+
+    UTILS_PROC Shared &operator=(Shared &other) {
+        destroy();
+
+        other.count++;
+
+        ptr = other.ptr;
+        ptr_count = other.ptr_count;
+        allocator = other.allocator;
+        count = other.count;
+
+        return *this;
+    }
+
+    UTILS_PROC Shared &operator=(Shared &&other) {
+        destroy();
+
+        ptr = other.ptr;
+        ptr_count = other.ptr_count;
+        allocator = other.allocator;
+        count = other.count;
+
+        return *this;
+    }
+
+    UTILS_PROC void destroy() {
+        if (ptr == nullptr || ptr_count == 0 || count == nullptr)
+            return;
+
+        (*count)--;
+
+        if (*count != 0)
+            return;
+
+        dealloc(ptr, ptr_count, allocator);
+        dealloc(count, 1, allocator);
+    }
+
+    UTILS_PROC ~Shared() { destroy(); }
+};
+
+UTILS_PROC_INIT void _global_allocator_destroy_init() {
+    static auto _allocator = Allocator_Static<1024 * 8>();
+    global_allocator = &_allocator;
 }
 
-Environment *Environment::instance = nullptr;
+UTILS_PROC_FINI void _global_allocator_destroy_fini() {
+    global_allocator->destroy();
+}
 
 } // namespace utils
