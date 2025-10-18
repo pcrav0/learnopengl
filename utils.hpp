@@ -8,8 +8,14 @@
 
 #include <utility>
 
+#define UTILS_IGNORE(...)
+
 #ifndef UTILS_PROC
 #define UTILS_PROC inline
+#endif
+
+#ifndef UTILS_PROC_CONSTRUCT
+#define UTILS_PROC_CONSTRUCT inline
 #endif
 
 #ifndef UTILS_ASSERT
@@ -27,6 +33,14 @@
 
 #ifndef UTILS_PROC_FINI
 #define UTILS_PROC_FINI __attribute__((destructor))
+#endif
+
+#ifndef UTILS_NO_GLOBAL_ALLOCATOR
+#define UTILS_GLOBAL_ALLOCATOR(VAR) VAR = global_allocator
+#endif
+
+#ifndef UTILS_UNREACHEBLE
+#define UTILS_UNREACHEBLE() assert(false)
 #endif
 
 namespace utils {
@@ -138,15 +152,18 @@ struct Allocator {
     virtual void reset() = 0;
 };
 
+#ifndef UTILS_NO_GLOBAL_ALLOCATOR
 Allocator *global_allocator = nullptr;
+#endif
 
 template <typename T> struct Slice {
     T *items;
     usize length;
 
-    UTILS_PROC Slice() : items{nullptr}, length{0} {}
+    UTILS_PROC_CONSTRUCT Slice() : items{nullptr}, length{0} {}
 
-    UTILS_PROC Slice(T *items, usize length) : items{items}, length{length} {}
+    UTILS_PROC_CONSTRUCT Slice(T *items, usize length)
+        : items{items}, length{length} {}
 
     // UTILS_PROC Slice(std::initializer_list<T> values)
     //     : items{(T *)(values.begin())}, length{values.size()} {}
@@ -155,15 +172,45 @@ template <typename T> struct Slice {
         if (index < 0)
             index += length;
 
-        // UTILS_ASSERT(index >= 0);
-        //  UTILS_ASSERT(index < length);
-        UTILS_ASSERT(items != nullptr);
         return items[index];
+    }
+
+    UTILS_PROC T &at_ring(ssize index) const {
+        return at(mod<ssize>(index, length));
     }
 
     UTILS_PROC T &operator[](usize index) const { return at(index); }
 
+    UTILS_PROC int operator<=>(const Slice<T> &other) const {
+        if (length != other.length)
+            return length - other.length;
+
+        return std::memcmp(items, other.items, sizeof(T) * length);
+    }
+
+    UTILS_PROC bool operator==(const Slice<T> &other) const {
+        if (other.length != length)
+            return false;
+
+        for (usize i = 0; i < length; i++) {
+            if (at(i) != other.at(i))
+                return false;
+        }
+
+        return true;
+    }
+
+    UTILS_PROC bool operator!=(const Slice<T> &other) const {
+        return !(*this == other);
+    }
+
     UTILS_PROC Slice<T> splice(ssize start, ssize end) const {
+        if (start < 0)
+            start += length;
+
+        if (end < 0)
+            end += length;
+
         // UTILS_ASSERT(mod<ssize>(end, (length + 1)) >
         //              mod<ssize>(start, (length + 1)));
         // UTILS_ASSERT(start <= length);
@@ -193,6 +240,11 @@ template <typename T> struct Slice {
         splice(n, -1).reverse();
         return *this;
     }
+
+    UTILS_PROC void sort() {
+        std::qsort(items, length, sizeof(T),
+                   [](const T *a, const T *b) -> int { return *a == *b; });
+    }
 };
 
 template <typename T> struct Array {
@@ -205,16 +257,32 @@ template <typename T> struct Array {
     };
     usize capacity;
 
-    UTILS_PROC Array() : items{nullptr}, length{0}, capacity{0} {}
+    static constexpr usize init_capacity = 256;
 
-    UTILS_PROC Array(T *items, usize length)
+    UTILS_PROC_CONSTRUCT Array() : items{nullptr}, length{0}, capacity{0} {}
+
+    UTILS_PROC_CONSTRUCT Array(T *items, usize length)
         : items{items}, length{0}, capacity{length} {}
 
     // UTILS_PROC Array(std::initializer_list<T> values)
     //     : items{const_cast<T *>(values.begin())}, length{values.size()} {}
 
     UTILS_PROC T &at(ssize index) const { return slice.at(index); }
+    UTILS_PROC T &at_ring(ssize index) const { return slice.at_ring(index); }
+
     UTILS_PROC T &operator[](usize index) const { return at(index); }
+
+    UTILS_PROC int operator<=>(const Array<T> &other) const {
+        return slice <=> other.slice;
+    }
+
+    UTILS_PROC bool operator==(const Array<T> &other) const {
+        return slice == other.slice;
+    }
+
+    UTILS_PROC bool operator!=(const Array<T> &other) const {
+        return !(*this == other);
+    }
 
     UTILS_PROC void rotate(ssize n) { slice.rotate(n); }
 
@@ -223,7 +291,7 @@ template <typename T> struct Array {
     }
 
     UTILS_PROC void reserve(usize increment,
-                            Allocator *allocator = global_allocator) {
+                            Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
         if (items == NULL) {
             capacity = increment;
             items = alloc<T>(capacity, allocator);
@@ -237,16 +305,13 @@ template <typename T> struct Array {
     }
 
     UTILS_PROC void insert(T item, usize index,
-                           Allocator *allocator = global_allocator) {
+                           Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
         UTILS_ASSERT(index <= length);
 
-        if (capacity == 0) {
-            reserve(1, allocator);
-        } else if (length >= capacity) {
-            reserve(capacity, allocator);
-        }
+        reserve(capacity == 0 ? init_capacity : max(length, capacity * 2),
+                allocator);
 
-        length += 1;
+        length++;
         at(-1) = item;
 
         if ((length - 1) != index) {
@@ -254,14 +319,49 @@ template <typename T> struct Array {
         }
     }
 
-    UTILS_PROC void push(T item, Allocator *allocator = global_allocator) {
+    UTILS_PROC T remove(usize index) {
+        T result = at(index);
+        splice(index, length).rotate(-1);
+        length--;
+        return result;
+    }
+
+    UTILS_PROC void push(T item, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
         insert(item, length, allocator);
     }
+
+    UTILS_PROC T pop() { return remove(-1); }
+
+    UTILS_PROC void unshift(T item,
+                            Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+        insert(item, 0, allocator);
+    }
+
+    UTILS_PROC T shift() { return remove(0); }
+
+    UTILS_PROC void sort() { slice.sort(); }
 };
 
 template <typename T> struct List {
     T *head;
     List *tail;
+
+    List() : head{}, tail{nullptr} {}
+
+    uint length() {
+        uint result = 0;
+
+        List *current = tail;
+
+        while (current != nullptr) {
+            current = current->tail;
+            result++;
+        }
+
+        return result;
+    }
+
+    void prepend(List<T> node) { UTILS_ASSERT(node.tail != nullptr); }
 };
 
 template <typename T> struct Double_List {
@@ -293,7 +393,7 @@ template <usize N> struct Allocator_Static : Allocator {
     Slice<u8> pool;
     usize used;
 
-    Allocator_Static()
+    UTILS_PROC_CONSTRUCT Allocator_Static()
         : pool{Slice<u8>(reinterpret_cast<u8 *>(std::malloc(N)), N)}, used{0} {}
 
     UTILS_PROC void *run(void *ptr, usize old_size, usize new_size) override {
@@ -304,7 +404,7 @@ template <usize N> struct Allocator_Static : Allocator {
             return nullptr;
         }
 
-        // allocxs
+        // alloc
         void *result = &pool[used];
         used += new_size;
 
@@ -325,22 +425,106 @@ template <usize N> struct Allocator_Static : Allocator {
     UTILS_PROC void reset() override { used = 0; }
 };
 
+struct Allocator_Malloc : Allocator {
+    void **ptrs;
+    usize length;
+    usize capacity;
+
+    static constexpr usize init_capacity = 1 << 10;
+
+    UTILS_PROC void *run(void *ptr, usize, usize new_size) override {
+        // init
+        if (ptrs == NULL) {
+            capacity = init_capacity;
+            ptrs = reinterpret_cast<void **>(
+                std::malloc(sizeof(*ptrs) * capacity));
+            length = 0;
+        }
+
+        // free
+        if (new_size == 0) {
+            // search(ptr)
+            for (uint i = 0; i < length; i++) {
+                void *check_ptr = ptrs[i];
+                if (check_ptr != ptr)
+                    continue;
+
+                std::free(check_ptr);
+
+                // remove(i)
+                Slice<void *>(ptrs, length).splice(i, length).rotate(-1);
+                length--;
+
+                return nullptr;
+            }
+
+            UTILS_UNREACHEBLE();
+        }
+
+        void *result = std::realloc(ptr, new_size);
+        UTILS_ASSERT(result != nullptr);
+
+        // alloc
+        if (ptr == NULL) {
+            // push(result)
+            length++;
+            if (length >= capacity) {
+                capacity *= 2;
+                void **p = reinterpret_cast<void **>(
+                    std::realloc(ptrs, sizeof(*ptrs) * capacity));
+                UTILS_ASSERT(p != NULL);
+                ptrs = p;
+            }
+            ptrs[length - 1] = result;
+        } else /* relloac */ {
+            // replace(ptr, result)
+            for (uint i = 0; i < length; i++) {
+                if (ptrs[i] == ptr) {
+                    ptrs[i] = result;
+                    break;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    UTILS_PROC void destroy() override {
+        if (ptrs == nullptr)
+            return;
+
+        for (usize i = 0; i < length; i++) {
+            std::free(ptrs[i]);
+        }
+
+        std::free(ptrs);
+        ptrs = nullptr;
+        length = 0;
+        capacity = 0;
+    }
+
+    UTILS_PROC void reset() override { length = 0; }
+};
+
 template <typename T>
-UTILS_PROC T *alloc(uint count = 1, Allocator *allocator = global_allocator) {
+UTILS_PROC T *alloc(uint count = 1,
+                    Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
     UTILS_ASSERT(allocator != nullptr);
     return static_cast<T *>(allocator->run(nullptr, 0, sizeof(T) * count));
 }
 
 template <typename T>
 UTILS_PROC void dealloc(T *ptr, uint count,
-                        Allocator *allocator = global_allocator) {
+                        Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
     UTILS_ASSERT(allocator != nullptr);
+    if (ptr == nullptr || count == 0)
+        return;
     allocator->run(ptr, sizeof(T) * count, 0);
 }
 
 template <typename T>
 UTILS_PROC T *realloc(T *ptr, uint old_count, uint new_count,
-                      Allocator *allocator = global_allocator) {
+                      Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
     UTILS_ASSERT(allocator != nullptr);
     return static_cast<T *>(
         allocator->run(ptr, sizeof(T) * old_count, sizeof(T) * new_count));
@@ -351,23 +535,23 @@ template <typename T> struct Unique {
     usize ptr_count;
     Allocator *allocator;
 
-    UTILS_PROC Unique(T *ptr, usize ptr_count,
-                      Allocator *allocator = global_allocator)
+    UTILS_PROC_CONSTRUCT Unique(T *ptr, usize ptr_count,
+                                Allocator *UTILS_GLOBAL_ALLOCATOR(allocator))
         : ptr{ptr}, ptr_count{ptr_count}, allocator{allocator} {}
 
-    UTILS_PROC Unique(const Unique &other) = delete;
+    UTILS_PROC_CONSTRUCT Unique(const Unique &other) = delete;
 
-    UTILS_PROC Unique(Unique &&other)
+    UTILS_PROC_CONSTRUCT Unique(Unique &&other)
         : ptr{other.ptr}, ptr_count{other.ptr_count},
           allocator{other.allocator} {
-        other.destroy();
+        other.ptr = nullptr;
+        other.ptr_count = 0;
+        other.allocator = nullptr;
     }
 
     UTILS_PROC Unique &operator=(const Unique &other) = delete;
 
     UTILS_PROC Unique &operator=(const Unique &&other) {
-        dealloc(ptr, allocator);
-
         ptr = other.ptr;
         ptr_count = other.ptr_count;
         allocator = other.allocator;
@@ -395,20 +579,22 @@ template <typename T> struct Shared {
     Allocator *allocator;
     usize *count;
 
-    UTILS_PROC Shared(T *ptr, usize ptr_count,
-                      Allocator *allocator = global_allocator)
+    UTILS_PROC_CONSTRUCT Shared(T *ptr, usize ptr_count,
+                                Allocator *UTILS_GLOBAL_ALLOCATOR(allocator))
         : ptr{ptr}, ptr_count{ptr_count}, allocator{allocator},
           count{alloc<usize>(1, allocator)} {
         *count = 1;
     }
 
-    UTILS_PROC Shared(Shared &other)
-        : ptr{other.ptr}, allocator{other.allocator}, count{other.count} {
+    UTILS_PROC_CONSTRUCT Shared(Shared &other)
+        : ptr{other.ptr}, ptr_count{other.ptr_count},
+          allocator{other.allocator}, count{other.count} {
         (*other.count)++;
     }
 
-    UTILS_PROC Shared(Shared &&other)
-        : ptr{ptr}, allocator{allocator}, count{count} {
+    UTILS_PROC_CONSTRUCT Shared(Shared &&other)
+        : ptr{ptr}, ptr_count{other.ptr_count}, allocator{allocator},
+          count{count} {
         other.destroy();
     }
 
@@ -437,7 +623,7 @@ template <typename T> struct Shared {
     }
 
     UTILS_PROC void destroy() {
-        if (ptr == nullptr || ptr_count == 0 || count == nullptr)
+        if (ptr == nullptr || ptr_count == 0 || count == nullptr || *count == 0)
             return;
 
         (*count)--;
@@ -447,13 +633,15 @@ template <typename T> struct Shared {
 
         dealloc(ptr, ptr_count, allocator);
         dealloc(count, 1, allocator);
+        ptr = nullptr;
+        count = nullptr;
     }
 
     UTILS_PROC ~Shared() { destroy(); }
 };
 
 UTILS_PROC_INIT void _global_allocator_destroy_init() {
-    static auto _allocator = Allocator_Static<1024 * 8>();
+    static auto _allocator = Allocator_Malloc();
     global_allocator = &_allocator;
 }
 

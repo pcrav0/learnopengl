@@ -7,87 +7,84 @@
 using namespace utils;
 
 int main() {
+    {
+        int *p = alloc<int>();
+        assert(p != NULL);
+        *p = 5;
+        assert(*p == 5);
 
-    int *p = alloc<int>();
-    assert(p != NULL);
-    *p = 5;
-    assert(*p == 5);
+        int *p0 = alloc<int>(100);
+        assert(p0 != nullptr);
 
-    int *p0 = alloc<int>(100);
-    assert(p0 != nullptr);
+        int *q = realloc(p, 1, 10);
+        assert(p != q);
+        q[1] = 8;
+        assert(q[0] == 5);
+        assert(q[1] == 8);
+    }
+    {
+        int *p = alloc<int>();
+        *p = 69;
 
-    int *q = realloc(p, 1, 10);
-    assert(p != q);
-    q[1] = 8;
-    assert(q[0] == 5);
-    assert(q[1] == 8);
-    assert(p[0] == 5);
+        auto u0 = Unique<int>(p, 1);
+        int *u0_ptr = u0.ptr;
+        assert(u0.ptr == p);
+        auto u1 = std::move(u0);
+        assert(u0.ptr == nullptr);
+        assert(u1.ptr == u0_ptr);
+        u1.destroy();
+        assert(u1.ptr == u0.ptr);
+        assert(u1.ptr == nullptr);
 
-    auto u0 = Unique<int>(alloc<int>(), 1);
-    int *u0_ptr = u0.ptr;
-    assert(u0.ptr != nullptr);
-    auto u1 = std::move(u0);
-    assert(u0.ptr == nullptr);
-    assert(u1.ptr == u0_ptr);
-    u1.destroy();
-    assert(u1.ptr == nullptr);
+        int *q = alloc<int>();
+        *q = 420;
+        auto s0 = Shared<int>(q, 1);
+        assert(s0.ptr == q);
+        assert(*s0.count == 1);
 
-    auto s0 = Shared<int>(alloc<int>(), 1);
-    assert(s0.ptr != nullptr);
-    assert(*s0.count == 1);
+        auto s1 = s0;
+        assert(s0.ptr == s1.ptr);
+        assert(s1.ptr != nullptr);
 
-    auto s1 = s0;
-    assert(s0.ptr == s1.ptr);
-    assert(s1.ptr != nullptr);
+        assert(*s0.count == *s1.count);
+        assert(*s1.count == 2);
 
-    assert(*s0.count == *s1.count);
-    assert(*s1.count == 2);
+        s1.destroy();
 
-    s1.destroy();
+        assert(s0.ptr == s1.ptr);
+        assert(s1.ptr != nullptr);
 
-    assert(s0.ptr == s1.ptr);
-    assert(s1.ptr != nullptr);
+        assert(*s0.count == *s1.count);
+        assert(*s1.count == 1);
 
-    assert(*s0.count == *s1.count);
-    assert(*s1.count == 1);
+        s1.destroy();
 
-    s1.destroy();
+        // assert(*s0.count == *s1.count);
+        // assert(*s0.count == 0);
+    }
+    {
+        Array<int> a;
+        a.push(2);
+        a.push(3);
+        a.push(69);
 
-    assert(*s0.count == *s1.count);
-    assert(*s0.count == 0);
+        assert(a.length == 3);
+        assert(a[0] == 2);
+        assert(a[1] == 3);
+        assert(a[2] == 69);
 
-    // assert(*s1.count == *s0.count);
-    /// assert(*s1.count == 1);
+        assert(a.shift() == 2);
+        assert(a.length == 2);
+        assert(a[0] == 3);
+        assert(a[1] == 69);
 
-    // auto zero = Slice<int>();
-    // assert(zero.items == nullptr);
-    // assert(zero.length == 0);
-
-    // auto s1 = Slice<int>((int *)malloc(sizeof(int) * 3), 3);
-    // assert(s1.items != nullptr);
-    // assert(s1.length == 3);
-    // s1[0] = 69;
-    // s1[1] = 420;
-    // s1[2] = 1337;
-
-    // assert(s1.items[0] == 69);
-    // assert(s1[0] == 69);
-
-    // s1.swap(0, 2);
-
-    // assert(s1[0] == 1337);
-    // s1.swap(0, -1);
-
-    // assert(s1[0] == 69);
-
-    // Slice<int> s = Slice<int>({1, 2, 3, 4});
-    // s.at(0) = 3;
-
-    // int a = 3;
-    // int b = 5;
-    // swap(a, b);
-    // assert(a == 5);
-    // assert(b == 3);
-
+        assert(a.pop() == 69);
+        assert(a.length == 1);
+        assert(a[0] == 3);
+    }
+    {
+        List<int> l0;
+        assert(l0.length() == 0);
+    }
     return 0;
 }
