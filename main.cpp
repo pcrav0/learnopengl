@@ -85,6 +85,56 @@ int main() {
     {
         List<int> l0;
         assert(l0.length() == 0);
+
+        l0.prepend(3);
+        assert(l0.length() == 1);
+        assert(l0.at(0).head == 3);
+
+        l0.prepend(69);
+        assert(l0.length() == 2);
+        assert(l0.at(0).head == 69);
+        assert(l0.at(1).head == 3);
+
+        l0.append(420);
+        assert(l0.length() == 3);
+        assert(l0.at(0).head == 69);
+        assert(l0.at(1).head == 3);
+        assert(l0.at(2).head == 420);
+
+        l0.append(42);
+        assert(l0.length() == 4);
+        assert(l0.at(0).head == 69);
+        assert(l0.at(1).head == 3);
+        assert(l0.at(2).head == 420);
+        assert(l0.at(3).head == 42);
+
+        l0.prepend(-1);
+        l0.next();
+        assert(l0.length() == 4);
+        assert(l0.at(0).head == 69);
+        assert(l0.at(1).head == 3);
+        assert(l0.at(2).head == 420);
+        assert(l0.at(3).head == 42);
+
+        l0.remove(1);
+        assert(l0.length() == 3);
+        assert(l0.at(0).head == 69);
+        assert(l0.at(1).head == 420);
+        assert(l0.at(2).head == 42);
+
+        l0.remove(2);
+        assert(l0.length() == 2);
+        assert(l0.at(0).head == 69);
+        assert(l0.at(1).head == 420);
+
+        l0.next();
+        assert(l0.length() == 1);
+        assert(l0.at(0).head == 420);
+
+        l0.next();
+        assert(l0.length() == 0);
+    }
+    {
     }
 
     printf("nice\n");

@@ -391,25 +391,97 @@ template <typename T> struct Array {
 };
 
 template <typename T> struct List {
-    T *head;
-    List *tail;
+    struct Node {
+        T head;
+        Node *tail;
+    };
 
-    List() : head{}, tail{nullptr} {}
+    Node *node;
 
-    uint length() {
-        uint result = 0;
+    UTILS_PROC_CONSTRUCT List() : node{nullptr} {}
 
-        List *current = tail;
+    UTILS_PROC_CONSTRUCT List(Node *node) : node{node} {}
 
+    UTILS_PROC List loop(auto f) const {
+        Node *current = node;
         while (current != nullptr) {
+            if (!f(current))
+                break;
             current = current->tail;
-            result++;
         }
 
+        return *this;
+    }
+
+    UTILS_PROC uint length() const {
+        uint result = 0;
+        loop([&](Node *) {
+            result++;
+            return true;
+        });
         return result;
     }
 
-    void prepend(List<T> node) { UTILS_ASSERT(node.tail != nullptr); }
+    UTILS_PROC Node &last() const {
+        Node *result = nullptr;
+        loop([&](Node *current) {
+            result = current;
+            return true;
+        });
+        return *result;
+    }
+
+    Node &at(uint index) const {
+        Node *current = node;
+
+        for (uint i = 0; i < index; i++)
+            current = current->tail;
+
+        return *current;
+    }
+
+    List append(T item, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+        UTILS_ASSERT(node != nullptr);
+        Node *current = &last();
+
+        current->tail = alloc<Node>(2, allocator);
+        current = current->tail;
+        current->head = item;
+        current->tail = nullptr;
+
+        return *this;
+    }
+
+    List prepend(T item, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+        Node *result = alloc<Node>(2, allocator);
+        result->head = item;
+        result->tail = node;
+
+        node = result;
+
+        return *this;
+    }
+
+    List remove(uint index, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+        if (node == nullptr)
+            return *this;
+
+        Node *to_remove = &at(index);
+        if (index == 0) {
+            node = node->tail;
+        } else if (index == length()) {
+            at(index - 1).tail = nullptr;
+        } else {
+            at(index - 1).tail = &at(index + 1);
+        }
+
+        dealloc(to_remove, 2, allocator);
+        return *this;
+    }
+
+    List next(Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+        return remove(0);
+    }
 };
 
 template <typename T> struct Double_List {
