@@ -392,8 +392,8 @@ template <typename T> struct Array {
 
 template <typename T> struct List {
     struct Node {
-        T head;
-        Node *tail;
+        T head = {};
+        Node *tail = nullptr;
     };
 
     Node *node;
@@ -431,7 +431,7 @@ template <typename T> struct List {
         return *result;
     }
 
-    Node &at(uint index) const {
+    UTILS_PROC Node &at(uint index) const {
         Node *current = node;
 
         for (uint i = 0; i < index; i++)
@@ -440,7 +440,8 @@ template <typename T> struct List {
         return *current;
     }
 
-    List append(T item, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+    UTILS_PROC List append(T item,
+                           Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
         UTILS_ASSERT(node != nullptr);
         Node *current = &last();
 
@@ -452,7 +453,8 @@ template <typename T> struct List {
         return *this;
     }
 
-    List prepend(T item, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+    UTILS_PROC List prepend(T item,
+                            Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
         Node *result = alloc<Node>(2, allocator);
         result->head = item;
         result->tail = node;
@@ -462,7 +464,8 @@ template <typename T> struct List {
         return *this;
     }
 
-    List remove(uint index, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+    UTILS_PROC List remove(uint index,
+                           Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
         if (node == nullptr)
             return *this;
 
@@ -479,15 +482,205 @@ template <typename T> struct List {
         return *this;
     }
 
-    List next(Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+    UTILS_PROC List forward(Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
         return remove(0);
     }
+
+    // TODO: bool has_cycle() {...}
+    // TODO: List chain() {...} // create a cycle
 };
 
 template <typename T> struct Double_List {
-    T *head;
-    Double_List *next;
-    Double_List *prev;
+    struct Node {
+        T head = {};
+        Node *next = nullptr;
+        Node *prev = nullptr;
+    };
+
+    Node *node;
+
+    UTILS_PROC_CONSTRUCT Double_List() : node{nullptr} {}
+
+    UTILS_PROC_CONSTRUCT Double_List(Node *node) : node{node} {}
+
+    UTILS_PROC Double_List loop_next(auto f) const {
+        Node *current = node;
+        while (current != nullptr) {
+            if (!f(current))
+                break;
+            current = current->next;
+        }
+
+        return *this;
+    }
+
+    UTILS_PROC Double_List loop_prev(auto f) const {
+        Node *current = node;
+        while (current != nullptr) {
+            if (!f(current))
+                break;
+            current = current->prev;
+        }
+
+        return *this;
+    }
+
+    UTILS_PROC uint length_next() const {
+        uint result = 0;
+
+        if (node == nullptr)
+            return 0;
+
+        Node *current = node->next;
+        while (current != nullptr) {
+            current = current->next;
+            result++;
+        }
+
+        return result;
+    }
+
+    UTILS_PROC uint length_prev() const {
+        uint result = 0;
+
+        if (node == nullptr)
+            return 0;
+
+        Node *current = node->prev;
+        while (current != nullptr) {
+            current = current->prev;
+            result++;
+        }
+
+        return result;
+    }
+
+    UTILS_PROC Node &last_next() const {
+        Node *result = node;
+        while (result->next != nullptr)
+            result = result->next;
+        return *result;
+    }
+
+    UTILS_PROC Node &last_prev() const {
+        Node *result = node;
+        while (result->prev != nullptr)
+            result = result->prev;
+        return *result;
+    }
+
+    UTILS_PROC Node &at_next(uint index) const {
+        Node *current = node;
+
+        for (uint i = 0; i < index; i++)
+            current = current->next;
+
+        return *current;
+    }
+
+    UTILS_PROC Node &at_prev(uint index) const {
+        Node *current = node;
+
+        for (uint i = 0; i < index; i++)
+            current = current->prev;
+
+        return *current;
+    }
+
+    UTILS_PROC Node &at(int index) const {
+        if (index == 0)
+            return node;
+        if (index > 0)
+            return at_next((uint)index);
+        if (index < 0)
+            return at_next((uint)(index * -1));
+    }
+
+    UTILS_PROC Double_List
+    append_next(T item, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+        UTILS_ASSERT(node != nullptr);
+        Node *it = &last_next();
+
+        it->next = alloc<Node>(2, allocator);
+        it = it->next;
+        it->head = item;
+        it->next = nullptr;
+        it->prev = node;
+
+        return *this;
+    }
+
+    UTILS_PROC Double_List
+    append_prev(T item, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+        UTILS_ASSERT(node != nullptr);
+        Node *it = &last_prev();
+
+        it->prev = alloc<Node>(2, allocator);
+        it = it->prev;
+        it->head = item;
+        it->next = node;
+        it->prev = nullptr;
+
+        return *this;
+    }
+
+    UTILS_PROC Double_List
+    prepend_next(T item, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+        Node *it = alloc<Node>(2, allocator);
+        it->head = item;
+        it->next = node;
+        it->prev = node == nullptr ? nullptr : node->prev;
+
+        node = it;
+
+        return *this;
+    }
+
+    UTILS_PROC Double_List
+    prepend_prev(T item, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+        Node *it = alloc<Node>(2, allocator);
+        it->head = item;
+        it->next = node == nullptr ? nullptr : node->next;
+        it->prev = node;
+
+        node = it;
+
+        return *this;
+    }
+
+    UTILS_PROC Double_List
+    remove(int index, Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+        if (node == nullptr)
+            return *this;
+
+        Node *to_remove = &at(index);
+
+        if (index == length_next()) {
+            at(index - 1).next = nullptr;
+        } else if (index == length_prev()) {
+            at(index - 1).prev = nullptr;
+        } else {
+            Node *it_prev = &at(index).prev;
+            Node *it_next = &at(index).next;
+            if (it_prev == nullptr && it_next == nullptr) {
+                node = nullptr;
+            } else if (it_prev == nullptr) {
+                it_next->prev = nullptr;
+            } else if (it_next == nullptr) {
+                it_prev->next = nullptr;
+            } else {
+                it_prev->next = it_next;
+                it_next->prev = it_prev;
+            }
+        }
+
+        dealloc(to_remove, 2, allocator);
+        return *this;
+    }
+
+    // List forward(Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
+    //     return remove(length_n);
+    // }
 };
 
 struct String {

@@ -109,7 +109,7 @@ int main() {
         assert(l0.at(3).head == 42);
 
         l0.prepend(-1);
-        l0.next();
+        l0.forward();
         assert(l0.length() == 4);
         assert(l0.at(0).head == 69);
         assert(l0.at(1).head == 3);
@@ -127,14 +127,94 @@ int main() {
         assert(l0.at(0).head == 69);
         assert(l0.at(1).head == 420);
 
-        l0.next();
+        l0.forward();
         assert(l0.length() == 1);
         assert(l0.at(0).head == 420);
 
-        l0.next();
+        l0.forward();
         assert(l0.length() == 0);
     }
     {
+        auto l0 = Double_List<int>();
+        assert(l0.length_next() == 0);
+        assert(l0.length_prev() == 0);
+
+        l0.prepend_next(420);
+        assert(l0.length_next() == 0);
+        assert(l0.length_prev() == 0);
+
+        l0.prepend_next(69);
+        assert(l0.length_next() == 1);
+        assert(l0.length_prev() == 0);
+
+        l0.prepend_next(-420);
+        assert(l0.length_next() == 2);
+        assert(l0.length_prev() == 0);
+
+        l0.prepend_prev(-69);
+        assert(l0.length_next() == 2);
+        assert(l0.length_prev() == 1);
+
+        l0.prepend_prev(2);
+        assert(l0.length_next() == 2);
+        assert(l0.length_prev() == 2);
+
+        assert(l0.last_prev().head == -420);
+        assert(l0.last_next().head == 420);
+
+        printf("prev: \n");
+        l0.loop_prev([](auto *it) {
+            static uint i = 0;
+            if (i == 0) {
+                i++;
+                return true;
+            }
+            printf("%d, ", it->head);
+            return true;
+        });
+
+        printf("\nhead: \n%d\n", l0.node->head);
+
+        printf("next: \n");
+        l0.loop_next([](auto *it) {
+            static uint i = 0;
+            if (i == 0) {
+                i++;
+                return true;
+            }
+            printf("%d, ", it->head);
+            return true;
+        });
+
+        // for (Double_List<int>::Node *it = &l0.last_prev(); it != nullptr;
+        //      it = it->next) {
+        //     printf(" %d ", it->head);
+
+        //     printf("<->");
+        // }
+
+        // printf(" %d ", l0.node->head);
+
+        // for (Double_List<int>::Node *it = l0.node->next; it != nullptr;
+        //      it = it->next) {
+        //     printf("<->");
+
+        //     printf(" %d ", it->head);
+        // }
+
+        // for (Double_List<int>::Node *it = l0.node->next; it != nullptr;
+        //      it = it->next) {
+        //     if (it->next == nullptr)
+        //         break;
+
+        //     printf("%d ", it->head);
+
+        //     if (it->next != nullptr)
+        //         printf("<->");
+        //     printf(" ");
+        // }
+
+        puts("");
     }
 
     printf("nice\n");
