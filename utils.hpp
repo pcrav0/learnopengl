@@ -219,11 +219,12 @@ template <typename T> struct Slice {
         return Slice<T>(&at(start), end - start);
     }
 
-    UTILS_PROC void swap(ssize a, ssize b) {
+    UTILS_PROC Slice<T> swap(ssize a, ssize b) {
         if (a == b)
-            return;
+            return *this;
 
         utils::swap(at(a), at(b));
+        return *this;
     }
 
     UTILS_PROC Slice<T> reverse() {
@@ -238,12 +239,59 @@ template <typename T> struct Slice {
         reverse();
         splice(0, n).reverse();
         splice(n, -1).reverse();
+
         return *this;
     }
 
     UTILS_PROC void sort() {
         std::qsort(items, length, sizeof(T),
                    [](const T *a, const T *b) -> int { return *a == *b; });
+
+        return *this;
+    }
+};
+
+template <typename T, usize N> struct Block {
+    T items[N];
+
+    Slice<T> slice() { return Slice<T>(items, N); }
+
+    UTILS_PROC T &at(ssize index) { return slice().at(index); }
+
+    UTILS_PROC T &at_ring(ssize index) const { return slice().at_ring(index); }
+
+    UTILS_PROC T &operator[](usize index) const { return at(index); }
+
+    UTILS_PROC int operator<=>(const Block<T, N> &other) const {
+        return slice() <=> other.slice();
+    }
+
+    UTILS_PROC bool operator==(const Block<T, N> &other) const {
+        return slice() == other.slice();
+    }
+
+    UTILS_PROC bool operator!=(const Slice<T> &other) const {
+        return !(*this == other);
+    }
+
+    UTILS_PROC Block<T, N> swap(ssize a, ssize b) {
+        slice().swap();
+        return *this;
+    }
+
+    UTILS_PROC Block<T, N> reverse() {
+        slice().reverse();
+        return *this;
+    }
+
+    UTILS_PROC Block<T, N> rotate(ssize n) {
+        slice().rotate(n);
+        return *this;
+    }
+
+    UTILS_PROC Block<T, N> sort() {
+        slice().sort();
+        return *this;
     }
 };
 

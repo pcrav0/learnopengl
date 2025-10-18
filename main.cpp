@@ -86,5 +86,7 @@ int main() {
         List<int> l0;
         assert(l0.length() == 0);
     }
+
+    printf("nice\n");
     return 0;
 }
