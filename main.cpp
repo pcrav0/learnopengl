@@ -138,26 +138,32 @@ int main() {
                 auto l0 = Double_List<int>();
                 assert(l0.length_next() == 0);
                 assert(l0.length_prev() == 0);
+                assert(l0.length() == 0);
 
                 l0.prepend_next(420);
                 assert(l0.length_next() == 0);
                 assert(l0.length_prev() == 0);
+                assert(l0.length() == 1);
 
                 l0.prepend_next(69);
                 assert(l0.length_next() == 1);
                 assert(l0.length_prev() == 0);
+                assert(l0.length() == 2);
 
                 l0.prepend_next(-420);
                 assert(l0.length_next() == 2);
                 assert(l0.length_prev() == 0);
+                assert(l0.length() == 3);
 
                 l0.prepend_prev(-69);
                 assert(l0.length_next() == 2);
                 assert(l0.length_prev() == 1);
+                assert(l0.length() == 4);
 
                 l0.prepend_prev(2);
                 assert(l0.length_next() == 2);
                 assert(l0.length_prev() == 2);
+                assert(l0.length() == 5);
 
                 assert(l0.at(-2).head == -420);
                 assert(l0.at(-1).head == -69);
@@ -165,34 +171,18 @@ int main() {
                 assert(l0.at(1).head == 69);
                 assert(l0.at(2).head == 420);
 
-                // assert(l0.remove(0).head == 2);
-                //  l0.remove(0);
+                l0.append_next(911);
+                l0.append_prev(-911);
+                assert(l0.remove(3).head == 911);
+                assert(l0.remove(-3).head == -911);
 
-                printf("prev: \n");
-                l0.loop_prev([](auto *it) {
-                        static uint i = 0;
-                        if (i == 0) {
-                                i++;
-                                return true;
-                        }
-                        printf("%d, ", it->head);
-                        return true;
-                });
-
-                printf("\nhead: \n%d\n", l0.node->head);
-
-                printf("next: \n");
-                l0.loop_next([](auto *it) {
-                        static uint i = 0;
-                        if (i == 0) {
-                                i++;
-                                return true;
-                        }
-                        printf("%d, ", it->head);
-                        return true;
-                });
+                assert(l0.forward().head == 2);
+                assert(l0.remove(1).head == 420);
+                assert(l0.backward().head == 69);
+                assert(l0.remove(-1).head == -420);
+                assert(l0.remove().head == -69);
         }
 
-        printf("nice\n");
+        printf("\nnice\n");
         return 0;
 }

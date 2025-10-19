@@ -107,6 +107,12 @@ template <typename T, typename... Rest> UTILS_PROC T max(T x, Rest... rest) {
     return x < y ? y : x;
 }
 
+template <typename T> T *non_nil(T *ptr) {
+    static T fallback = {};
+    memset(&fallback, 0, sizeof(T));
+    return ptr == nullptr ? &fallback : ptr;
+}
+
 template <typename T> UTILS_PROC T clamp(T x, T low, T high) {
     return min(max(low, x), high);
 }
@@ -444,7 +450,7 @@ template <typename T, Allocator *allocator = nullptr> struct List {
         UTILS_ASSERT(node != nullptr);
         Node *current = &last();
 
-        current->tail = alloc<Node>(2, allocator);
+        current->tail = alloc<Node>(1, allocator);
         current = current->tail;
         current->head = item;
         current->tail = nullptr;
@@ -453,7 +459,7 @@ template <typename T, Allocator *allocator = nullptr> struct List {
     }
 
     UTILS_PROC List prepend(T item) {
-        Node *result = alloc<Node>(2, allocator);
+        Node *result = alloc<Node>(1, allocator);
         result->head = item;
         result->tail = node;
 
@@ -475,7 +481,7 @@ template <typename T, Allocator *allocator = nullptr> struct List {
             at(index - 1).tail = &at(index + 1);
         }
 
-        dealloc(to_remove, 2, allocator);
+        dealloc(to_remove, 1, allocator);
         return *this;
     }
 
@@ -550,6 +556,13 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         return result;
     }
 
+    UTILS_PROC uint length() const {
+        if (node == nullptr)
+            return 0;
+
+        return 1 + length_next() + length_prev();
+    }
+
     UTILS_PROC Node &last_next() const {
         Node *result = node;
         while (result->next != nullptr)
@@ -562,6 +575,21 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         while (result->prev != nullptr)
             result = result->prev;
         return *result;
+    }
+
+    UTILS_PROC Node &last() const {
+        Node *left = node;
+        Node *right = node;
+
+        while (true) {
+            if (left->prev == nullptr)
+                return left;
+            left = left->prev;
+
+            if (right->next == nullptr)
+                return right;
+            right = right->next;
+        }
     }
 
     UTILS_PROC Node &at_next(uint index) const {
@@ -594,85 +622,93 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
     }
 
     UTILS_PROC Double_List append_next(T item) {
-        UTILS_ASSERT(node != nullptr);
-        Node *it = &last_next();
+        if (node == nullptr)
+            prepend_next(item);
 
-        it->next = alloc<Node>(2, allocator);
-        it = it->next;
+        Node *last = &last_next();
+        Node *it = alloc<Node>(1, allocator);
+
+        last->next = it;
+
         it->head = item;
         it->next = nullptr;
-        it->prev = node;
+        it->prev = last;
 
         return *this;
     }
 
     UTILS_PROC Double_List append_prev(T item) {
-        UTILS_ASSERT(node != nullptr);
-        Node *it = &last_prev();
+        if (node == nullptr)
+            prepend_prev(item);
 
-        it->prev = alloc<Node>(2, allocator);
-        it = it->prev;
+        Node *last = &last_prev();
+        Node *it = alloc<Node>(1, allocator);
+
+        last->prev = it;
+
         it->head = item;
-        it->next = node;
+        it->next = last;
         it->prev = nullptr;
 
         return *this;
     }
 
     UTILS_PROC Double_List prepend_next(T item) {
-        Node *it = alloc<Node>(2, allocator);
+        Node *it = alloc<Node>(1, allocator);
+
         it->head = item;
         it->next = node;
-        it->prev = node == nullptr ? nullptr : node->prev;
+        it->prev = non_nil(node)->prev;
 
-        node = it;
+        non_nil(non_nil(node)->prev)->next = it;
+        non_nil(it->prev)->next = it;
+
+        swap(node, it);
 
         return *this;
     }
 
     UTILS_PROC Double_List prepend_prev(T item) {
-        Node *it = alloc<Node>(2, allocator);
+        Node *it = alloc<Node>(1, allocator);
+
         it->head = item;
-        it->next = node == nullptr ? nullptr : node->next;
+        it->next = non_nil(node)->next;
         it->prev = node;
 
-        node = it;
+        non_nil(non_nil(node)->next)->prev = it;
+        non_nil(node)->next = it;
+
+        swap(node, it);
 
         return *this;
     }
 
-    UTILS_PROC Node remove(int index) {
+    UTILS_PROC Node remove(int index = 0, int choose = 0) {
         UTILS_ASSERT(node != nullptr);
 
         Node *to_remove = &at(index);
-
-        if (index == length_next()) {
-            at(index - 1).next = nullptr;
-        } else if (index == length_prev()) {
-            at(index - 1).prev = nullptr;
-        } else {
-            Node *it_prev = at(index).prev;
-            Node *it_next = at(index).next;
-            if (it_prev == nullptr && it_next == nullptr) {
-                node = nullptr;
-            } else if (it_prev == nullptr) {
-                it_next->prev = nullptr;
-            } else if (it_next == nullptr) {
-                it_prev->next = nullptr;
-            } else {
-                it_prev->next = it_next;
-                it_next->prev = it_prev;
-            }
-        }
-
         Node result = *to_remove;
-        dealloc(to_remove, 2, allocator);
+        Node *it_prev = at(index).prev;
+        Node *it_next = at(index).next;
+
+        non_nil(it_prev)->next = it_next;
+        non_nil(it_next)->prev = it_prev;
+
+        if (index == 0)
+            node = max(it_prev, it_next);
+
+        if (choose > 0 && node != it_next && it_next != nullptr)
+            node = it_next;
+
+        if (choose < 0 && node != it_prev && it_prev != nullptr)
+            node = it_prev;
+
+        dealloc(to_remove, 1, allocator);
         return result;
     }
 
-    // List forward(Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
-    //     return remove(length_n);
-    // }
+    Node forward() { return remove(0, 1); }
+    Node backward() { return remove(0, -1); }
 };
 
 struct String {
