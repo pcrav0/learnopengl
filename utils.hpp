@@ -15,7 +15,15 @@
 #endif
 
 #ifndef UTILS_PROC_CONSTRUCT
-#define UTILS_PROC_CONSTRUCT inline
+#define UTILS_PROC_CONSTRUCT explicit inline
+#endif
+
+#ifndef UTILS_PROC_CONSTRUCT_MOVE
+#define UTILS_PROC_CONSTRUCT_MOVE inline
+#endif
+
+#ifndef UTILS_PROC_CONSTRUCT_COPY
+#define UTILS_PROC_CONSTRUCT_COPY inline
 #endif
 
 #ifndef UTILS_ASSERT
@@ -576,11 +584,13 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
 
     UTILS_PROC Node &at(int index) const {
         if (index == 0)
-            return node;
+            return *node;
         if (index > 0)
             return at_next((uint)index);
         if (index < 0)
-            return at_next((uint)(index * -1));
+            return at_prev((uint)(index * -1));
+
+        UTILS_UNREACHEBLE();
     }
 
     UTILS_PROC Double_List append_next(T item) {
@@ -631,9 +641,8 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         return *this;
     }
 
-    UTILS_PROC Double_List remove(int index) {
-        if (node == nullptr)
-            return *this;
+    UTILS_PROC Node remove(int index) {
+        UTILS_ASSERT(node != nullptr);
 
         Node *to_remove = &at(index);
 
@@ -642,8 +651,8 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         } else if (index == length_prev()) {
             at(index - 1).prev = nullptr;
         } else {
-            Node *it_prev = &at(index).prev;
-            Node *it_next = &at(index).next;
+            Node *it_prev = at(index).prev;
+            Node *it_next = at(index).next;
             if (it_prev == nullptr && it_next == nullptr) {
                 node = nullptr;
             } else if (it_prev == nullptr) {
@@ -656,8 +665,9 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
             }
         }
 
+        Node result = *to_remove;
         dealloc(to_remove, 2, allocator);
-        return *this;
+        return result;
     }
 
     // List forward(Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
@@ -756,7 +766,8 @@ struct Allocator_Malloc : Allocator {
             UTILS_UNREACHEBLE();
         }
 
-        void *result = std::realloc(ptr, new_size);
+        void *result =
+            std::realloc(ptr, /* memory alignment */ max(new_size, 16));
         UTILS_ASSERT(result != nullptr);
 
         // alloc
@@ -845,11 +856,11 @@ template <typename T, Allocator *allocator = nullptr> struct Unique {
     usize ptr_count;
 
     UTILS_PROC_CONSTRUCT Unique(T *ptr, usize ptr_count)
-        : ptr{ptr}, ptr_count{ptr_count} {}
+        : ptr(ptr), ptr_count(ptr_count) {}
 
-    UTILS_PROC_CONSTRUCT Unique(const Unique &other) = delete;
+    UTILS_PROC_CONSTRUCT_COPY Unique(const Unique &other) = delete;
 
-    UTILS_PROC_CONSTRUCT Unique(Unique &&other)
+    UTILS_PROC_CONSTRUCT_MOVE Unique(Unique &&other)
         : ptr{other.ptr}, ptr_count{other.ptr_count} {
         other.ptr = nullptr;
         other.ptr_count = 0;
@@ -863,6 +874,10 @@ template <typename T, Allocator *allocator = nullptr> struct Unique {
 
         return *this;
     }
+
+    UTILS_PROC T *addr() { return ptr; }
+    UTILS_PROC T operator*() { return *addr(); }
+    UTILS_PROC T *operator->() { return addr(); }
 
     UTILS_PROC void destroy() {
         if (ptr == nullptr || ptr_count == 0)
@@ -878,63 +893,93 @@ template <typename T, Allocator *allocator = nullptr> struct Unique {
 };
 
 template <typename T, Allocator *allocator = nullptr> struct Shared {
-    T *ptr;
-    usize ptr_count;
-    usize *count;
+    struct Control_Block {
+        T *ptr;
+        usize ptr_count;
+        uint *counter;
+
+        UTILS_PROC_CONSTRUCT Control_Block(T *ptr, usize ptr_count,
+                                           uint *counter)
+            : ptr(ptr), ptr_count(ptr_count), counter(counter) {}
+
+        UTILS_PROC_CONSTRUCT Control_Block(T *ptr, usize ptr_count)
+            : ptr(ptr), ptr_count(ptr_count),
+              counter(alloc<uint>(1, allocator)) {
+            *counter = 1;
+        }
+
+        UTILS_PROC uint inc() { return ++(*counter); }
+        UTILS_PROC uint dec() { return --(*counter); }
+
+        UTILS_PROC void destroy() {
+            if (ptr == nullptr || ptr_count == 0 || counter == nullptr ||
+                *counter == 0)
+                return;
+
+            if (dec() == 0) {
+                dealloc<T>(ptr, ptr_count, allocator);
+                ptr = nullptr;
+                ptr_count = 0;
+
+                dealloc<uint>(counter, 1, allocator);
+                counter = nullptr;
+
+                dealloc<Control_Block>(this, 1, allocator);
+            }
+        }
+    };
+
+    Control_Block *control;
 
     UTILS_PROC_CONSTRUCT Shared(T *ptr, usize ptr_count)
-        : ptr{ptr}, ptr_count{ptr_count}, count{alloc<usize>(1, allocator)} {
-        *count = 1;
+        : control(alloc<Control_Block>(1, allocator)) {
+        *control = Control_Block(ptr, ptr_count);
     }
 
-    UTILS_PROC_CONSTRUCT Shared(Shared &other)
-        : ptr{other.ptr}, ptr_count{other.ptr_count}, count{other.count} {
-        (*other.count)++;
+    UTILS_PROC_CONSTRUCT_COPY Shared(Shared &other)
+        : control(alloc<Control_Block>(1, allocator)) {
+        *control = Control_Block(other.control->ptr, other.control->ptr_count,
+                                 other.control->counter);
+        other.control->inc();
     }
 
-    UTILS_PROC_CONSTRUCT Shared(Shared &&other)
-        : ptr{ptr}, ptr_count{other.ptr_count}, count{count} {
-        other.destroy();
+    UTILS_PROC_CONSTRUCT_MOVE Shared(Shared &&other)
+        : control(Control_Block(other.control->ptr, other.control->ptr_count,
+                                other.control->count)) {
+        other.control->destroy();
     }
 
     UTILS_PROC Shared &operator=(Shared &other) {
-        destroy();
+        control->destroy();
 
-        other.count++;
+        other.control->inc();
 
-        ptr = other.ptr;
-        ptr_count = other.ptr_count;
-        count = other.count;
+        control->ptr = control->other.ptr;
+        control->ptr_count = control->other.ptr_count;
+        control->count = control->other.count;
 
         return *this;
     }
 
     UTILS_PROC Shared &operator=(Shared &&other) {
-        destroy();
+        control->destroy();
 
-        ptr = other.ptr;
-        ptr_count = other.ptr_count;
-        count = other.count;
+        control->ptr = control->other.ptr;
+        control->ptr_count = control->other.ptr_count;
+        control->count = control->other.count;
+
+        other.control->destroy();
 
         return *this;
     }
 
-    UTILS_PROC void destroy() {
-        if (ptr == nullptr || ptr_count == 0 || count == nullptr || *count == 0)
-            return;
+    UTILS_PROC T *addr() { return control->ptr; }
+    UTILS_PROC T operator*() { return *addr(); }
+    UTILS_PROC T *operator->() { return addr(); }
 
-        (*count)--;
+    UTILS_PROC uint counter() { return *control->counter; }
 
-        if (*count != 0)
-            return;
-
-        dealloc(ptr, ptr_count, allocator);
-        dealloc(count, 1, allocator);
-        ptr = nullptr;
-        count = nullptr;
-    }
-
-    UTILS_PROC ~Shared() { destroy(); }
+    UTILS_PROC ~Shared() { control->destroy(); }
 };
 
 UTILS_PROC_INIT void _global_allocator_destroy_init() {

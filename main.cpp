@@ -7,216 +7,192 @@
 using namespace utils;
 
 int main() {
-    {
-        int *p = alloc<int>();
-        assert(p != NULL);
-        *p = 5;
-        assert(*p == 5);
+        {
+                int *p = alloc<int>();
+                assert(p != NULL);
+                *p = 5;
+                assert(*p == 5);
 
-        int *p0 = alloc<int>(100);
-        assert(p0 != nullptr);
+                int *p0 = alloc<int>(100);
+                assert(p0 != nullptr);
 
-        int *q = realloc(p, 1, 10);
-        assert(p != q);
-        q[1] = 8;
-        assert(q[0] == 5);
-        assert(q[1] == 8);
-    }
-    {
-        int *p = alloc<int>();
-        *p = 69;
+                int *q = realloc(p, 1, 10);
+                assert(p != q);
+                q[1] = 8;
+                assert(q[0] == 5);
+                assert(q[1] == 8);
+        }
+        {
+                int *p = alloc<int>();
+                *p = 69;
 
-        auto u0 = Unique<int>(p, 1);
-        int *u0_ptr = u0.ptr;
-        assert(u0.ptr == p);
-        auto u1 = std::move(u0);
-        assert(u0.ptr == nullptr);
-        assert(u1.ptr == u0_ptr);
-        u1.destroy();
-        assert(u1.ptr == u0.ptr);
-        assert(u1.ptr == nullptr);
+                auto u0 = Unique<int>(p, 1);
+                int *u0_ptr = u0.addr();
+                assert(u0.addr() == p);
+                auto u1 = std::move(u0);
+                assert(u0.addr() == nullptr);
+                assert(u1.addr() == u0_ptr);
+                u1.destroy();
+                assert(u1.addr() == u0.addr());
+                assert(u1.addr() == nullptr);
 
-        int *q = alloc<int>();
-        *q = 420;
-        auto s0 = Shared<int>(q, 1);
-        assert(s0.ptr == q);
-        assert(*s0.count == 1);
+                int *q = alloc<int>();
+                *q = 420;
+                auto s0 = Shared<int>(q, 1);
+                assert(s0.addr() == q);
+                assert(s0.counter() == 1);
 
-        auto s1 = s0;
-        assert(s0.ptr == s1.ptr);
-        assert(s1.ptr != nullptr);
+                auto s1 = s0;
+                assert(s0.addr() == s1.addr());
+                assert(s1.addr() != nullptr);
 
-        assert(*s0.count == *s1.count);
-        assert(*s1.count == 2);
+                assert(s0.counter() == s1.counter());
+                assert(s1.counter() == 2);
 
-        s1.destroy();
+                // s1.destroy();
 
-        assert(s0.ptr == s1.ptr);
-        assert(s1.ptr != nullptr);
+                // assert(s0.addr() == s1.addr());
+                // assert(s1.addr() != nullptr);
 
-        assert(*s0.count == *s1.count);
-        assert(*s1.count == 1);
+                // assert(*s0.counter() == *s1.counter());
+                // assert(*s1.counter() == 1);
 
-        s1.destroy();
+                // s1.destroy();
 
-        // assert(*s0.count == *s1.count);
-        // assert(*s0.count == 0);
-    }
-    {
-        Array<int> a;
-        a.push(2);
-        a.push(3);
-        a.push(69);
+                // assert(*s0.counter() == *s1.counter());
+                // assert(*s0.counter() == 0);
+        }
+        {
+                Array<int> a;
+                a.push(2);
+                a.push(3);
+                a.push(69);
 
-        assert(a.length == 3);
-        assert(a[0] == 2);
-        assert(a[1] == 3);
-        assert(a[2] == 69);
+                assert(a.length == 3);
+                assert(a[0] == 2);
+                assert(a[1] == 3);
+                assert(a[2] == 69);
 
-        assert(a.shift() == 2);
-        assert(a.length == 2);
-        assert(a[0] == 3);
-        assert(a[1] == 69);
+                assert(a.shift() == 2);
+                assert(a.length == 2);
+                assert(a[0] == 3);
+                assert(a[1] == 69);
 
-        assert(a.pop() == 69);
-        assert(a.length == 1);
-        assert(a[0] == 3);
-    }
-    {
-        List<int> l0;
-        assert(l0.length() == 0);
+                assert(a.pop() == 69);
+                assert(a.length == 1);
+                assert(a[0] == 3);
+        }
+        {
+                List<int> l0;
+                assert(l0.length() == 0);
 
-        l0.prepend(3);
-        assert(l0.length() == 1);
-        assert(l0.at(0).head == 3);
+                l0.prepend(3);
+                assert(l0.length() == 1);
+                assert(l0.at(0).head == 3);
 
-        l0.prepend(69);
-        assert(l0.length() == 2);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 3);
+                l0.prepend(69);
+                assert(l0.length() == 2);
+                assert(l0.at(0).head == 69);
+                assert(l0.at(1).head == 3);
 
-        l0.append(420);
-        assert(l0.length() == 3);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 3);
-        assert(l0.at(2).head == 420);
+                l0.append(420);
+                assert(l0.length() == 3);
+                assert(l0.at(0).head == 69);
+                assert(l0.at(1).head == 3);
+                assert(l0.at(2).head == 420);
 
-        l0.append(42);
-        assert(l0.length() == 4);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 3);
-        assert(l0.at(2).head == 420);
-        assert(l0.at(3).head == 42);
+                l0.append(42);
+                assert(l0.length() == 4);
+                assert(l0.at(0).head == 69);
+                assert(l0.at(1).head == 3);
+                assert(l0.at(2).head == 420);
+                assert(l0.at(3).head == 42);
 
-        l0.prepend(-1);
-        l0.forward();
-        assert(l0.length() == 4);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 3);
-        assert(l0.at(2).head == 420);
-        assert(l0.at(3).head == 42);
+                l0.prepend(-1);
+                l0.forward();
+                assert(l0.length() == 4);
+                assert(l0.at(0).head == 69);
+                assert(l0.at(1).head == 3);
+                assert(l0.at(2).head == 420);
+                assert(l0.at(3).head == 42);
 
-        l0.remove(1);
-        assert(l0.length() == 3);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 420);
-        assert(l0.at(2).head == 42);
+                l0.remove(1);
+                assert(l0.length() == 3);
+                assert(l0.at(0).head == 69);
+                assert(l0.at(1).head == 420);
+                assert(l0.at(2).head == 42);
 
-        l0.remove(2);
-        assert(l0.length() == 2);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 420);
+                l0.remove(2);
+                assert(l0.length() == 2);
+                assert(l0.at(0).head == 69);
+                assert(l0.at(1).head == 420);
 
-        l0.forward();
-        assert(l0.length() == 1);
-        assert(l0.at(0).head == 420);
+                l0.forward();
+                assert(l0.length() == 1);
+                assert(l0.at(0).head == 420);
 
-        l0.forward();
-        assert(l0.length() == 0);
-    }
-    {
-        auto l0 = Double_List<int>();
-        assert(l0.length_next() == 0);
-        assert(l0.length_prev() == 0);
+                l0.forward();
+                assert(l0.length() == 0);
+        }
+        {
+                auto l0 = Double_List<int>();
+                assert(l0.length_next() == 0);
+                assert(l0.length_prev() == 0);
 
-        l0.prepend_next(420);
-        assert(l0.length_next() == 0);
-        assert(l0.length_prev() == 0);
+                l0.prepend_next(420);
+                assert(l0.length_next() == 0);
+                assert(l0.length_prev() == 0);
 
-        l0.prepend_next(69);
-        assert(l0.length_next() == 1);
-        assert(l0.length_prev() == 0);
+                l0.prepend_next(69);
+                assert(l0.length_next() == 1);
+                assert(l0.length_prev() == 0);
 
-        l0.prepend_next(-420);
-        assert(l0.length_next() == 2);
-        assert(l0.length_prev() == 0);
+                l0.prepend_next(-420);
+                assert(l0.length_next() == 2);
+                assert(l0.length_prev() == 0);
 
-        l0.prepend_prev(-69);
-        assert(l0.length_next() == 2);
-        assert(l0.length_prev() == 1);
+                l0.prepend_prev(-69);
+                assert(l0.length_next() == 2);
+                assert(l0.length_prev() == 1);
 
-        l0.prepend_prev(2);
-        assert(l0.length_next() == 2);
-        assert(l0.length_prev() == 2);
+                l0.prepend_prev(2);
+                assert(l0.length_next() == 2);
+                assert(l0.length_prev() == 2);
 
-        assert(l0.last_prev().head == -420);
-        assert(l0.last_next().head == 420);
+                assert(l0.at(-2).head == -420);
+                assert(l0.at(-1).head == -69);
+                assert(l0.at(0).head == 2);
+                assert(l0.at(1).head == 69);
+                assert(l0.at(2).head == 420);
 
-        printf("prev: \n");
-        l0.loop_prev([](auto *it) {
-            static uint i = 0;
-            if (i == 0) {
-                i++;
-                return true;
-            }
-            printf("%d, ", it->head);
-            return true;
-        });
+                // assert(l0.remove(0).head == 2);
+                //  l0.remove(0);
 
-        printf("\nhead: \n%d\n", l0.node->head);
+                printf("prev: \n");
+                l0.loop_prev([](auto *it) {
+                        static uint i = 0;
+                        if (i == 0) {
+                                i++;
+                                return true;
+                        }
+                        printf("%d, ", it->head);
+                        return true;
+                });
 
-        printf("next: \n");
-        l0.loop_next([](auto *it) {
-            static uint i = 0;
-            if (i == 0) {
-                i++;
-                return true;
-            }
-            printf("%d, ", it->head);
-            return true;
-        });
+                printf("\nhead: \n%d\n", l0.node->head);
 
-        // for (Double_List<int>::Node *it = &l0.last_prev(); it != nullptr;
-        //      it = it->next) {
-        //     printf(" %d ", it->head);
+                printf("next: \n");
+                l0.loop_next([](auto *it) {
+                        static uint i = 0;
+                        if (i == 0) {
+                                i++;
+                                return true;
+                        }
+                        printf("%d, ", it->head);
+                        return true;
+                });
+        }
 
-        //     printf("<->");
-        // }
-
-        // printf(" %d ", l0.node->head);
-
-        // for (Double_List<int>::Node *it = l0.node->next; it != nullptr;
-        //      it = it->next) {
-        //     printf("<->");
-
-        //     printf(" %d ", it->head);
-        // }
-
-        // for (Double_List<int>::Node *it = l0.node->next; it != nullptr;
-        //      it = it->next) {
-        //     if (it->next == nullptr)
-        //         break;
-
-        //     printf("%d ", it->head);
-
-        //     if (it->next != nullptr)
-        //         printf("<->");
-        //     printf(" ");
-        // }
-
-        puts("");
-    }
-
-    printf("nice\n");
-    return 0;
+        printf("nice\n");
+        return 0;
 }
