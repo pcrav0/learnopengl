@@ -5,3 +5,4 @@
 
 # TODO
 - [ ] https://en.wikipedia.org/wiki/Block_sort
+- [ ] lazy lits
