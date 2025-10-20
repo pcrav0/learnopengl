@@ -11,40 +11,43 @@
 #define UTILS_IGNORE(...)
 
 #ifndef UTILS_PROC
-#define UTILS_PROC inline
+#define UTILS_PROC constexpr inline
+#endif
+
+#ifndef UTILS_PROC_INIT
+#define UTILS_PROC_INIT UTILS_PROC __attribute__((constructor))
+#endif
+
+#ifndef UTILS_PROC_FINI
+#define UTILS_PROC_FINI UTILS_PROC __attribute__((destructor))
 #endif
 
 #ifndef UTILS_PROC_CONSTRUCT
-#define UTILS_PROC_CONSTRUCT explicit inline
-#endif
-
-#ifndef UTILS_PROC_CONSTRUCT_MOVE
-#define UTILS_PROC_CONSTRUCT_MOVE inline
+#define UTILS_PROC_CONSTRUCT UTILS_PROC explicit
 #endif
 
 #ifndef UTILS_PROC_CONSTRUCT_COPY
-#define UTILS_PROC_CONSTRUCT_COPY inline
+#define UTILS_PROC_CONSTRUCT_COPY UTILS_PROC
+#endif
+
+#ifndef UTILS_PROC_CONSTRUCT_MOVE
+#define UTILS_PROC_CONSTRUCT_MOVE UTILS_PROC
+#endif
+
+#ifndef UTILS_PROC_DESTRUCT
+#define UTILS_PROC_DESTRUCT UTILS_PROC
 #endif
 
 #ifndef UTILS_ASSERT
 #include <assert.h>
 #define UTILS_ASSERT(...)                                                      \
     do {                                                                       \
-        asm("int3");                                                           \
         assert(__VA_ARGS__);                                                   \
     } while (0)
 #endif
 
 #ifndef UTILS_BREAKPOINT
 #define UTILS_BREAKPOINT() __asm__("int3")
-#endif
-
-#ifndef UTILS_PROC_INIT
-#define UTILS_PROC_INIT __attribute__((constructor))
-#endif
-
-#ifndef UTILS_PROC_FINI
-#define UTILS_PROC_FINI __attribute__((destructor))
 #endif
 
 #ifndef UTILS_NO_GLOBAL_ALLOCATOR
@@ -133,6 +136,47 @@ template <typename T> UTILS_PROC void copy(T *src, T *dest) {
     memcpy(static_cast<T *>(dest), static_cast<T *>(src), sizeof(T));
 }
 
+template <typename T> struct Reverse {
+    struct iterator {
+        T::iterator_type it;
+
+        UTILS_PROC_CONSTRUCT iterator(T::iterator_type it) : it(it) {}
+
+        UTILS_PROC iterator &operator++() {
+            --it;
+            return *this;
+        }
+
+        UTILS_PROC iterator operator++(int) {
+            auto tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        UTILS_PROC iterator &operator--() {
+            ++it;
+            return *this;
+        }
+
+        UTILS_PROC iterator operator--(int) {
+            auto tmp = *this;
+            --(*this);
+            return tmp;
+        }
+
+        UTILS_PROC bool operator==(const iterator &other) const {
+            return it == other.it;
+        }
+
+        UTILS_PROC T::iterator_it_type &operator*() { return *it; }
+        UTILS_PROC T::iterator_it_type *operator->() { return it; }
+    };
+
+    T container;
+    UTILS_PROC iterator begin() { return iterator(--container.end()); }
+    UTILS_PROC iterator end() { return iterator(--container.begin()); }
+};
+
 template <typename T, typename U> struct Pair {
     union {
         T first;
@@ -147,7 +191,7 @@ template <typename T, typename U> struct Pair {
         U y;
     };
 
-    Pair(T a, U b) : a(a), b(b) {}
+    UTILS_PROC_CONSTRUCT Pair(T a, U b) : a(a), b(b) {}
 };
 
 template <typename T> struct Maybe {
@@ -183,19 +227,19 @@ template <typename Value, typename Error> struct Result {
 };
 
 template <typename Value, typename Error>
-Result<Value, Error> result_value(Value value);
+UTILS_PROC Result<Value, Error> result_value(Value value);
 
 template <typename Value, typename Error>
-Result<Value, Error> result_error(Error value);
+UTILS_PROC Result<Value, Error> result_error(Error value);
 
 struct Allocator {
-    virtual void *run(void *ptr, usize old_size, usize new_size) = 0;
-    virtual void destroy() = 0;
-    virtual void reset() = 0;
+    UTILS_PROC virtual void *run(void *ptr, usize old_size, usize new_size) = 0;
+    UTILS_PROC virtual void destroy() = 0;
+    UTILS_PROC virtual void reset() = 0;
 };
 
 #ifndef UTILS_NO_GLOBAL_ALLOCATOR
-Allocator *global_allocator = nullptr;
+static Allocator *global_allocator = nullptr;
 #endif
 
 template <typename T> struct Slice {
@@ -210,11 +254,13 @@ template <typename T> struct Slice {
     // UTILS_PROC Slice(std::initializer_list<T> values)
     //     : items{(T *)(values.begin())}, length{values.size()} {}
 
+    UTILS_PROC T &at_raw(ssize index) const { return items[index]; }
+
     UTILS_PROC T &at(ssize index) const {
         if (index < 0)
             index += length;
 
-        return items[index];
+        return at_raw(index);
     }
 
     UTILS_PROC T &at_ring(ssize index) const {
@@ -223,14 +269,14 @@ template <typename T> struct Slice {
 
     UTILS_PROC T &operator[](usize index) const { return at(index); }
 
-    UTILS_PROC int operator<=>(const Slice<T> &other) const {
+    UTILS_PROC int operator<=>(const Slice &other) const {
         if (length != other.length)
             return length - other.length;
 
         return std::memcmp(items, other.items, sizeof(T) * length);
     }
 
-    UTILS_PROC bool operator==(const Slice<T> &other) const {
+    UTILS_PROC bool operator==(const Slice &other) const {
         if (other.length != length)
             return false;
 
@@ -242,11 +288,11 @@ template <typename T> struct Slice {
         return true;
     }
 
-    UTILS_PROC bool operator!=(const Slice<T> &other) const {
+    UTILS_PROC bool operator!=(const Slice &other) const {
         return !(*this == other);
     }
 
-    UTILS_PROC Slice<T> splice(ssize start, ssize end) const {
+    UTILS_PROC Slice splice(ssize start, ssize end) const {
         if (start < 0)
             start += length;
 
@@ -258,10 +304,10 @@ template <typename T> struct Slice {
         // UTILS_ASSERT(start <= length);
         // UTILS_ASSERT(end <= length);
 
-        return Slice<T>(&at(start), end - start);
+        return Slice(&at(start), end - start);
     }
 
-    UTILS_PROC Slice<T> swap(ssize a, ssize b) {
+    UTILS_PROC Slice swap(ssize a, ssize b) {
         if (a == b)
             return *this;
 
@@ -269,7 +315,7 @@ template <typename T> struct Slice {
         return *this;
     }
 
-    UTILS_PROC Slice<T> reverse() {
+    UTILS_PROC Slice reverse() {
         for (uint i = 0; i < length / 2; i++) {
             swap(i, length - 1 - i);
         }
@@ -277,7 +323,7 @@ template <typename T> struct Slice {
         return *this;
     }
 
-    UTILS_PROC Slice<T> rotate(ssize n) {
+    UTILS_PROC Slice rotate(ssize n) {
         reverse();
         splice(0, n).reverse();
         splice(n, -1).reverse();
@@ -285,7 +331,7 @@ template <typename T> struct Slice {
         return *this;
     }
 
-    UTILS_PROC void sort() {
+    UTILS_PROC Slice sort() {
         std::qsort(items, length, sizeof(T),
                    [](const T *a, const T *b) -> int { return *a == *b; });
 
@@ -296,7 +342,7 @@ template <typename T> struct Slice {
 template <typename T, usize N> struct Block {
     T items[N];
 
-    Slice<T> slice() { return Slice<T>(items, N); }
+    UTILS_PROC Slice<T> slice() { return Slice<T>(items, N); }
 
     UTILS_PROC T &at(ssize index) { return slice().at(index); }
 
@@ -338,6 +384,49 @@ template <typename T, usize N> struct Block {
 };
 
 template <typename T, Allocator *allocator = nullptr> struct Array {
+    struct iterator {
+        T *current;
+
+        UTILS_PROC_CONSTRUCT iterator(T *ptr) : current(ptr) {}
+
+        UTILS_PROC bool operator==(const iterator &other) const {
+            return current == other.current || current == nullptr ||
+                   other.current == nullptr;
+        }
+
+        UTILS_PROC bool operator!=(const iterator &other) const {
+            return !(*this == other);
+        }
+
+        UTILS_PROC iterator &operator++() {
+            ++current;
+            return *this;
+        }
+
+        UTILS_PROC iterator &operator++(T) {
+            iterator result = *this;
+            ++(*this);
+            return result;
+        }
+
+        UTILS_PROC iterator &operator--() {
+            --current;
+            return *this;
+        }
+
+        UTILS_PROC iterator &operator--(T) {
+            iterator result = *this;
+            --(*this);
+            return result;
+        }
+
+        UTILS_PROC T &operator*() { return *current; }
+        UTILS_PROC T *operator->() { return current; }
+    };
+
+    using iterator_it_type = T;
+    using iterator_type = iterator;
+
     union {
         struct {
             T *items;
@@ -357,13 +446,14 @@ template <typename T, Allocator *allocator = nullptr> struct Array {
     // UTILS_PROC Array(std::initializer_list<T> values)
     //     : items{const_cast<T *>(values.begin())}, length{values.size()} {}
 
-    UTILS_PROC T &at_valid(ssize index) const {
-        return Slice(items, capacity).at(index);
-    }
+    UTILS_PROC T &at_raw(ssize index) const { return slice.at_raw(index); }
     UTILS_PROC T &at(ssize index) const { return slice.at(index); }
     UTILS_PROC T &at_ring(ssize index) const { return slice.at_ring(index); }
 
     UTILS_PROC T &operator[](usize index) const { return at(index); }
+
+    UTILS_PROC iterator begin() { return iterator(&at(0)); }
+    UTILS_PROC iterator end() { return iterator(&at_raw(length)); }
 
     UTILS_PROC int operator<=>(const Array<T> &other) const {
         return slice <=> other.slice;
@@ -383,33 +473,43 @@ template <typename T, Allocator *allocator = nullptr> struct Array {
         return slice.splice(start, end);
     }
 
-    UTILS_PROC void reserve(usize increment) {
+    UTILS_PROC Array reserve(usize increment) {
+        if (increment == 0)
+            return *this;
+
         if (items == NULL) {
             capacity = increment;
             items = alloc<T>(capacity, allocator);
-            return;
+            return *this;
         }
 
         if (length + increment <= capacity)
-            return;
+            return *this;
 
         usize old_size = capacity;
-        capacity += increment;
+        do {
+            capacity *= 2;
+        } while (capacity < length + increment);
         usize new_size = capacity;
         items = realloc<T>(items, old_size, new_size, allocator);
+        return *this;
     }
 
-    UTILS_PROC void insert(T item, usize index) {
+    UTILS_PROC T &insert_reserve(usize index) {
         UTILS_ASSERT(index <= length);
-
         reserve(capacity == 0 ? init_capacity : max(length, capacity * 2));
 
         length++;
-        at(-1) = item;
+        memset(&at(-1), 0, sizeof(T));
 
-        if ((length - 1) != index) {
+        if ((length - 1) != index)
             splice(index, length).rotate(1);
-        }
+
+        return at_raw(index);
+    }
+
+    UTILS_PROC void insert(T item, usize index) {
+        insert_reserve(index) = item;
     }
 
     UTILS_PROC T remove(usize index) {
@@ -420,10 +520,12 @@ template <typename T, Allocator *allocator = nullptr> struct Array {
     }
 
     UTILS_PROC void push(T item) { insert(item, length); }
+    UTILS_PROC T &push_reserve() { return insert_reserve(length); }
 
     UTILS_PROC T pop() { return remove(-1); }
 
     UTILS_PROC void unshift(T item) { insert(item, 0); }
+    UTILS_PROC T &unshift_reserve() { return insert_reserve(0); }
 
     UTILS_PROC T shift() { return remove(0); }
 
@@ -447,7 +549,34 @@ template <typename T, Allocator *allocator = nullptr> struct List {
         T head = {};
         Node *tail = nullptr;
     };
-    using Node_type = Node;
+
+    struct iterator {
+        Node *current;
+
+        UTILS_PROC_CONSTRUCT iterator(Node *ptr) : current(ptr) {}
+
+        UTILS_PROC bool operator==(const iterator &other) const {
+            return current == other.current;
+        }
+
+        UTILS_PROC bool operator!=(const iterator &other) const {
+            return !(*this == other);
+        }
+
+        UTILS_PROC iterator &operator++() {
+            current = current->tail;
+            return *this;
+        }
+
+        UTILS_PROC iterator &operator++(T) {
+            iterator result = *this;
+            ++(*this);
+            return result;
+        }
+
+        UTILS_PROC Node &operator*() { return *current; }
+        UTILS_PROC Node *operator->() { return current; }
+    };
 
     Node *node;
 
@@ -494,7 +623,10 @@ template <typename T, Allocator *allocator = nullptr> struct List {
     }
 
     UTILS_PROC List append(T item) {
-        UTILS_ASSERT(node != nullptr);
+        if (node == nullptr) {
+            return prepend(item);
+        }
+
         Node *current = &last();
 
         current->tail = alloc<Node>(1, allocator);
@@ -534,6 +666,9 @@ template <typename T, Allocator *allocator = nullptr> struct List {
 
     UTILS_PROC List forward() { return remove(0); }
 
+    UTILS_PROC iterator begin() { return iterator(node); }
+    UTILS_PROC iterator end() { return iterator(nullptr); }
+
     // TODO: bool has_cycle() {...}
     // TODO: List chain() {...} // create a cycle
 };
@@ -544,6 +679,48 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         Node *next = nullptr;
         Node *prev = nullptr;
     };
+
+    struct iterator {
+        Node *current;
+
+        UTILS_PROC_CONSTRUCT iterator(Node *ptr) : current(ptr) {}
+
+        UTILS_PROC bool operator==(const iterator &other) const {
+            return current == other.current;
+        }
+
+        UTILS_PROC bool operator!=(const iterator &other) const {
+            return !(*this == other);
+        }
+
+        UTILS_PROC iterator &operator++() {
+            current = current->next;
+            return *this;
+        }
+
+        UTILS_PROC iterator &operator++(T) {
+            iterator result = *this;
+            ++(*this);
+            return result;
+        }
+
+        UTILS_PROC iterator &operator--() {
+            current = current->prev;
+            return *this;
+        }
+
+        UTILS_PROC iterator &operator--(T) {
+            iterator result = *this;
+            --(*this);
+            return result;
+        }
+
+        UTILS_PROC Node &operator*() { return *current; }
+        UTILS_PROC Node *operator->() { return current; }
+    };
+
+    using iterator_type = iterator;
+    using iterator_it_type = Node;
 
     Node *node;
 
@@ -754,14 +931,67 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         return result;
     }
 
-    Node forward() { return remove(0, 1); }
-    Node backward() { return remove(0, -1); }
+    UTILS_PROC Node forward() { return remove(0, 1); }
+    UTILS_PROC Node backward() { return remove(0, -1); }
+
+    UTILS_PROC iterator begin() { return iterator(&last_prev()); }
+    UTILS_PROC iterator end() { return iterator(&last_next()); }
 };
 
 template <typename Key, typename Value, Allocator *allocator = nullptr>
 struct Table {
     using Item = Pair<Key, Value>;
+    struct iterator {
+        Item *current;
+
+        UTILS_PROC_CONSTRUCT iterator(Item *ptr) : current(ptr) {}
+
+        UTILS_PROC bool operator==(const iterator &other) const {
+            return current == other.current || current == nullptr ||
+                   other.current == nullptr;
+        }
+
+        UTILS_PROC bool operator!=(const iterator &other) const {
+            return !(*this == other);
+        }
+
+        UTILS_PROC iterator &operator++() {
+            ++current;
+            return *this;
+        }
+
+        UTILS_PROC iterator &operator++(Value) {
+            iterator result = *this;
+            ++(*this);
+            return result;
+        }
+
+        UTILS_PROC iterator &operator--() {
+            --current;
+            return *this;
+        }
+
+        UTILS_PROC iterator &operator--(Value) {
+            iterator result = *this;
+            --(*this);
+            return result;
+        }
+
+        UTILS_PROC Item &operator*() { return *current; }
+        UTILS_PROC Item *operator->() { return current; }
+    };
+
+    using iterator_type = iterator;
+    using iterator_it_type = Item;
+
     Array<Item, allocator> items;
+
+    UTILS_PROC Item &at_raw(ssize index) const { return items.at_raw(index); }
+    UTILS_PROC Item &at(ssize index) const { return items.at(index); }
+    UTILS_PROC Item &at_ring(ssize index) const { return items.at_ring(index); }
+
+    UTILS_PROC iterator begin() { return iterator(&at(0)); }
+    UTILS_PROC iterator end() { return iterator(&at_raw(items.length)); }
 
     UTILS_PROC Maybe<Item *> search(const Key &key) const {
         for (usize i = 0; i < items.length; i++) {
@@ -775,12 +1005,18 @@ struct Table {
         return none<Item *>();
     }
 
-    UTILS_PROC void put(const Key &key, const Value &value) {
+    UTILS_PROC Table reserve(usize increment) {
+        items.reserve(increment);
+        return *this;
+    }
+
+    UTILS_PROC Table put(const Key &key, const Value &value) {
         if (auto it = search(key); it) {
             (*it)->value = value;
         }
 
         items.push(Item(key, value));
+        return *this;
     }
 
     UTILS_PROC Maybe<Value> get(const Key &key) const {
@@ -798,9 +1034,9 @@ struct Table {
 
         items.reserve(1);
 
-        Item *it = &items.at_valid(items.length);
-        memset(it, 0, sizeof(*it));
+        Item *it = &items.push_reserve();
         it->key = key;
+        it->value = {};
         return it->value;
     }
 };
@@ -827,7 +1063,7 @@ struct String {
     }
 };
 
-String operator""_s(const char *chars, usize length) {
+UTILS_PROC String operator""_s(const char *chars, usize length) {
     return String(const_cast<char *>(chars), length);
 }
 
@@ -1040,7 +1276,7 @@ template <typename T, Allocator *allocator = nullptr> struct Unique {
         ptr_count = 0;
     }
 
-    UTILS_PROC ~Unique() { destroy(); }
+    UTILS_PROC_DESTRUCT ~Unique() { destroy(); }
 };
 
 template <typename T, Allocator *allocator = nullptr> struct Shared {
@@ -1130,7 +1366,7 @@ template <typename T, Allocator *allocator = nullptr> struct Shared {
 
     UTILS_PROC uint counter() { return *control->counter; }
 
-    UTILS_PROC ~Shared() { control->destroy(); }
+    UTILS_PROC_DESTRUCT ~Shared() { control->destroy(); }
 };
 
 UTILS_PROC_INIT void _global_allocator_destroy_init() {
