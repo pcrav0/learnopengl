@@ -243,6 +243,49 @@ static Allocator *global_allocator = nullptr;
 #endif
 
 template <typename T> struct Slice {
+    struct iterator {
+        T *current;
+
+        UTILS_PROC_CONSTRUCT iterator(T *ptr) : current(ptr) {}
+
+        UTILS_PROC bool operator==(const iterator &other) const {
+            return current == other.current || current == nullptr ||
+                   other.current == nullptr;
+        }
+
+        UTILS_PROC bool operator!=(const iterator &other) const {
+            return !(*this == other);
+        }
+
+        UTILS_PROC iterator &operator++() {
+            ++current;
+            return *this;
+        }
+
+        UTILS_PROC iterator &operator++(T) {
+            iterator result = *this;
+            ++(*this);
+            return result;
+        }
+
+        UTILS_PROC iterator &operator--() {
+            --current;
+            return *this;
+        }
+
+        UTILS_PROC iterator &operator--(T) {
+            iterator result = *this;
+            --(*this);
+            return result;
+        }
+
+        UTILS_PROC T &operator*() { return *current; }
+        UTILS_PROC T *operator->() { return current; }
+    };
+
+    using iterator_it_type = T;
+    using iterator_type = iterator;
+
     T *items;
     usize length;
 
@@ -268,6 +311,9 @@ template <typename T> struct Slice {
     }
 
     UTILS_PROC T &operator[](usize index) const { return at(index); }
+
+    UTILS_PROC iterator begin() { return iterator(&at(0)); }
+    UTILS_PROC iterator end() { return iterator(&at_raw(length)); }
 
     UTILS_PROC int operator<=>(const Slice &other) const {
         if (length != other.length)
@@ -339,173 +385,54 @@ template <typename T> struct Slice {
     }
 };
 
-template <typename T, usize N> struct Block {
-    T items[N];
-
-    UTILS_PROC Slice<T> slice() { return Slice<T>(items, N); }
-
-    UTILS_PROC T &at(ssize index) { return slice().at(index); }
-
-    UTILS_PROC T &at_ring(ssize index) const { return slice().at_ring(index); }
-
-    UTILS_PROC T &operator[](usize index) const { return at(index); }
-
-    UTILS_PROC int operator<=>(const Block<T, N> &other) const {
-        return slice() <=> other.slice();
-    }
-
-    UTILS_PROC bool operator==(const Block<T, N> &other) const {
-        return slice() == other.slice();
-    }
-
-    UTILS_PROC bool operator!=(const Slice<T> &other) const {
-        return !(*this == other);
-    }
-
-    UTILS_PROC Block<T, N> swap(ssize a, ssize b) {
-        slice().swap();
-        return *this;
-    }
-
-    UTILS_PROC Block<T, N> reverse() {
-        slice().reverse();
-        return *this;
-    }
-
-    UTILS_PROC Block<T, N> rotate(ssize n) {
-        slice().rotate(n);
-        return *this;
-    }
-
-    UTILS_PROC Block<T, N> sort() {
-        slice().sort();
-        return *this;
-    }
-};
-
-template <typename T, Allocator *allocator = nullptr> struct Array {
-    struct iterator {
-        T *current;
-
-        UTILS_PROC_CONSTRUCT iterator(T *ptr) : current(ptr) {}
-
-        UTILS_PROC bool operator==(const iterator &other) const {
-            return current == other.current || current == nullptr ||
-                   other.current == nullptr;
-        }
-
-        UTILS_PROC bool operator!=(const iterator &other) const {
-            return !(*this == other);
-        }
-
-        UTILS_PROC iterator &operator++() {
-            ++current;
-            return *this;
-        }
-
-        UTILS_PROC iterator &operator++(T) {
-            iterator result = *this;
-            ++(*this);
-            return result;
-        }
-
-        UTILS_PROC iterator &operator--() {
-            --current;
-            return *this;
-        }
-
-        UTILS_PROC iterator &operator--(T) {
-            iterator result = *this;
-            --(*this);
-            return result;
-        }
-
-        UTILS_PROC T &operator*() { return *current; }
-        UTILS_PROC T *operator->() { return current; }
-    };
-
-    using iterator_it_type = T;
-    using iterator_type = iterator;
-
-    union {
-        struct {
-            T *items;
-            usize length;
-        };
-        Slice<T> slice;
-    };
+template <typename T, Allocator *allocator = nullptr>
+struct Array : public Slice<T> {
     usize capacity;
 
     static constexpr usize init_capacity = 256;
 
-    UTILS_PROC_CONSTRUCT Array() : items{nullptr}, length{0}, capacity{0} {}
+    UTILS_PROC_CONSTRUCT Array() : Slice<T>(), capacity{0} {}
 
     UTILS_PROC_CONSTRUCT Array(T *items, usize length)
-        : items{items}, length{0}, capacity{length} {}
+        : Slice<T>(items, length), capacity{length} {}
 
     // UTILS_PROC Array(std::initializer_list<T> values)
     //     : items{const_cast<T *>(values.begin())}, length{values.size()} {}
-
-    UTILS_PROC T &at_raw(ssize index) const { return slice.at_raw(index); }
-    UTILS_PROC T &at(ssize index) const { return slice.at(index); }
-    UTILS_PROC T &at_ring(ssize index) const { return slice.at_ring(index); }
-
-    UTILS_PROC T &operator[](usize index) const { return at(index); }
-
-    UTILS_PROC iterator begin() { return iterator(&at(0)); }
-    UTILS_PROC iterator end() { return iterator(&at_raw(length)); }
-
-    UTILS_PROC int operator<=>(const Array<T> &other) const {
-        return slice <=> other.slice;
-    }
-
-    UTILS_PROC bool operator==(const Array<T> &other) const {
-        return slice == other.slice;
-    }
-
-    UTILS_PROC bool operator!=(const Array<T> &other) const {
-        return !(*this == other);
-    }
-
-    UTILS_PROC void rotate(ssize n) { slice.rotate(n); }
-
-    UTILS_PROC Slice<T> splice(ssize start, ssize end) const {
-        return slice.splice(start, end);
-    }
 
     UTILS_PROC Array reserve(usize increment) {
         if (increment == 0)
             return *this;
 
-        if (items == NULL) {
+        if (this->items == NULL) {
             capacity = increment;
-            items = alloc<T>(capacity, allocator);
+            this->items = alloc<T>(capacity, allocator);
             return *this;
         }
 
-        if (length + increment <= capacity)
+        if (this->length + increment <= capacity)
             return *this;
 
         usize old_size = capacity;
         do {
             capacity *= 2;
-        } while (capacity < length + increment);
+        } while (capacity < this->length + increment);
         usize new_size = capacity;
-        items = realloc<T>(items, old_size, new_size, allocator);
+        this->items = realloc<T>(this->items, old_size, new_size, allocator);
         return *this;
     }
 
     UTILS_PROC T &insert_reserve(usize index) {
-        UTILS_ASSERT(index <= length);
-        reserve(capacity == 0 ? init_capacity : max(length, capacity * 2));
+        UTILS_ASSERT(index <= this->length);
+        reserve(capacity == 0 ? init_capacity
+                              : max(this->length, capacity * 2));
 
-        length++;
-        memset(&at(-1), 0, sizeof(T));
+        this->length++;
+        memset(&this->at(-1), 0, sizeof(T));
 
-        if ((length - 1) != index)
-            splice(index, length).rotate(1);
+        if ((this->length - 1) != index)
+            this->splice(index, this->length).rotate(1);
 
-        return at_raw(index);
+        return this->at_raw(index);
     }
 
     UTILS_PROC void insert(T item, usize index) {
@@ -513,14 +440,14 @@ template <typename T, Allocator *allocator = nullptr> struct Array {
     }
 
     UTILS_PROC T remove(usize index) {
-        T result = at(index);
-        splice(index, length).rotate(-1);
-        length--;
+        T result = this->at(index);
+        this->splice(index, this->length).rotate(-1);
+        this->length--;
         return result;
     }
 
-    UTILS_PROC void push(T item) { insert(item, length); }
-    UTILS_PROC T &push_reserve() { return insert_reserve(length); }
+    UTILS_PROC void push(T item) { insert(item, this->length); }
+    UTILS_PROC T &push_reserve() { return insert_reserve(this->length); }
 
     UTILS_PROC T pop() { return remove(-1); }
 
@@ -529,11 +456,9 @@ template <typename T, Allocator *allocator = nullptr> struct Array {
 
     UTILS_PROC T shift() { return remove(0); }
 
-    UTILS_PROC void sort() { slice.sort(); }
-
     UTILS_PROC Maybe<T *> search(T value) {
-        for (usize i = 0; i < length; i++) {
-            T *it = &at(i);
+        for (usize i = 0; i < this->length; i++) {
+            T *it = &this->at(i);
 
             if (it == value) {
                 return some(it);
@@ -939,7 +864,7 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
 };
 
 template <typename Key, typename Value, Allocator *allocator = nullptr>
-struct Table {
+struct Table : public Array<Pair<Key, Value>> {
     using Item = Pair<Key, Value>;
     struct iterator {
         Item *current;
@@ -984,18 +909,12 @@ struct Table {
     using iterator_type = iterator;
     using iterator_it_type = Item;
 
-    Array<Item, allocator> items;
-
-    UTILS_PROC Item &at_raw(ssize index) const { return items.at_raw(index); }
-    UTILS_PROC Item &at(ssize index) const { return items.at(index); }
-    UTILS_PROC Item &at_ring(ssize index) const { return items.at_ring(index); }
-
-    UTILS_PROC iterator begin() { return iterator(&at(0)); }
-    UTILS_PROC iterator end() { return iterator(&at_raw(items.length)); }
+    UTILS_PROC iterator begin() { return iterator(&this->at(0)); }
+    UTILS_PROC iterator end() { return iterator(&this->at_raw(this->length)); }
 
     UTILS_PROC Maybe<Item *> search(const Key &key) const {
-        for (usize i = 0; i < items.length; i++) {
-            Item *it = &items[i];
+        for (usize i = 0; i < this->length; i++) {
+            Item *it = &this->at(i);
 
             if (it->key == key) {
                 return some(it);
@@ -1005,17 +924,12 @@ struct Table {
         return none<Item *>();
     }
 
-    UTILS_PROC Table reserve(usize increment) {
-        items.reserve(increment);
-        return *this;
-    }
-
     UTILS_PROC Table put(const Key &key, const Value &value) {
         if (auto it = search(key); it) {
             (*it)->value = value;
         }
 
-        items.push(Item(key, value));
+        this->push(Item(key, value));
         return *this;
     }
 
@@ -1032,56 +946,41 @@ struct Table {
             return (*it)->value;
         }
 
-        items.reserve(1);
+        this->reserve(1);
 
-        Item *it = &items.push_reserve();
+        Item *it = &this->push_reserve();
         it->key = key;
         it->value = {};
         return it->value;
     }
 };
 
-struct String {
-    char *chars;
-    usize length;
-
+struct String : public Slice<char> {
     UTILS_PROC_CONSTRUCT String(char *chars, usize length)
-        : chars(chars), length(length) {}
-
-    UTILS_PROC bool operator==(const String &other) const {
-        if (length != other.length)
-            return false;
-
-        if (chars == other.chars)
-            return true;
-
-        return memcmp(chars, other.chars, length * sizeof(*chars)) == 0;
-    }
-
-    UTILS_PROC bool operator!=(const String &other) const {
-        return !(*this == other);
-    }
+        : Slice(chars, length) {}
 };
 
 UTILS_PROC String operator""_s(const char *chars, usize length) {
     return String(const_cast<char *>(chars), length);
 }
 
-template <Allocator *allocator = nullptr> union String_Builder {
-    struct {
-        union {
-            struct {
-                char *chars;
-                usize length;
-            };
-            String string;
-        };
-        usize capacity;
-    };
-    Array<char> array;
+template <Allocator *allocator = nullptr>
+struct String_Builder : public Array<char, allocator> {
+    UTILS_PROC String_Builder write(char c) {
+        this->push(c);
+        return *this;
+    }
+
+    UTILS_PROC String_Builder write(String string) {
+        for (char i = 0; i < string.length; i++) {
+            write(string[i]);
+        }
+
+        return *this;
+    }
 };
 
-template <usize N> struct Allocator_Static : Allocator {
+template <usize N> struct Allocator_Static : public Allocator {
     Slice<u8> pool;
     usize used;
 
@@ -1117,7 +1016,7 @@ template <usize N> struct Allocator_Static : Allocator {
     UTILS_PROC void reset() override { used = 0; }
 };
 
-struct Allocator_Malloc : Allocator {
+struct Allocator_Malloc : public Allocator {
     void **ptrs;
     usize length;
     usize capacity;
