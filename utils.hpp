@@ -28,7 +28,11 @@
 
 #ifndef UTILS_ASSERT
 #include <assert.h>
-#define UTILS_ASSERT assert
+#define UTILS_ASSERT(...)                                                      \
+    do {                                                                       \
+        asm("int3");                                                           \
+        assert(__VA_ARGS__);                                                   \
+    } while (0)
 #endif
 
 #ifndef UTILS_BREAKPOINT
@@ -129,9 +133,33 @@ template <typename T> UTILS_PROC void copy(T *src, T *dest) {
     memcpy(static_cast<T *>(dest), static_cast<T *>(src), sizeof(T));
 }
 
+template <typename T, typename U> struct Pair {
+    union {
+        T first;
+        T key;
+        T a;
+        T x;
+    };
+    union {
+        U second;
+        U value;
+        U b;
+        U y;
+    };
+
+    Pair(T a, U b) : a(a), b(b) {}
+};
+
 template <typename T> struct Maybe {
     T value;
     bool has;
+
+    UTILS_PROC T operator*() {
+        UTILS_ASSERT(has);
+        return value;
+    }
+
+    UTILS_PROC operator bool() { return has; }
 };
 
 template <typename T> Maybe<T> UTILS_PROC some(T value) {
@@ -329,6 +357,9 @@ template <typename T, Allocator *allocator = nullptr> struct Array {
     // UTILS_PROC Array(std::initializer_list<T> values)
     //     : items{const_cast<T *>(values.begin())}, length{values.size()} {}
 
+    UTILS_PROC T &at_valid(ssize index) const {
+        return Slice(items, capacity).at(index);
+    }
     UTILS_PROC T &at(ssize index) const { return slice.at(index); }
     UTILS_PROC T &at_ring(ssize index) const { return slice.at_ring(index); }
 
@@ -358,6 +389,9 @@ template <typename T, Allocator *allocator = nullptr> struct Array {
             items = alloc<T>(capacity, allocator);
             return;
         }
+
+        if (length + increment <= capacity)
+            return;
 
         usize old_size = capacity;
         capacity += increment;
@@ -394,6 +428,18 @@ template <typename T, Allocator *allocator = nullptr> struct Array {
     UTILS_PROC T shift() { return remove(0); }
 
     UTILS_PROC void sort() { slice.sort(); }
+
+    UTILS_PROC Maybe<T *> search(T value) {
+        for (usize i = 0; i < length; i++) {
+            T *it = &at(i);
+
+            if (it == value) {
+                return some(it);
+            }
+        }
+
+        return none<T>();
+    }
 };
 
 template <typename T, Allocator *allocator = nullptr> struct List {
@@ -401,6 +447,7 @@ template <typename T, Allocator *allocator = nullptr> struct List {
         T head = {};
         Node *tail = nullptr;
     };
+    using Node_type = Node;
 
     Node *node;
 
@@ -711,10 +758,78 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
     Node backward() { return remove(0, -1); }
 };
 
+template <typename Key, typename Value, Allocator *allocator = nullptr>
+struct Table {
+    using Item = Pair<Key, Value>;
+    Array<Item, allocator> items;
+
+    UTILS_PROC Maybe<Item *> search(const Key &key) const {
+        for (usize i = 0; i < items.length; i++) {
+            Item *it = &items[i];
+
+            if (it->key == key) {
+                return some(it);
+            }
+        }
+
+        return none<Item *>();
+    }
+
+    UTILS_PROC void put(const Key &key, const Value &value) {
+        if (auto it = search(key); it) {
+            (*it)->value = value;
+        }
+
+        items.push(Item(key, value));
+    }
+
+    UTILS_PROC Maybe<Value> get(const Key &key) const {
+        if (auto it = search(key); it) {
+            return some((*it)->value);
+        }
+
+        return none<Value>();
+    }
+
+    UTILS_PROC Value &operator[](const Key &key) {
+        if (auto it = search(key); it) {
+            return (*it)->value;
+        }
+
+        items.reserve(1);
+
+        Item *it = &items.at_valid(items.length);
+        memset(it, 0, sizeof(*it));
+        it->key = key;
+        return it->value;
+    }
+};
+
 struct String {
     char *chars;
     usize length;
+
+    UTILS_PROC_CONSTRUCT String(char *chars, usize length)
+        : chars(chars), length(length) {}
+
+    UTILS_PROC bool operator==(const String &other) const {
+        if (length != other.length)
+            return false;
+
+        if (chars == other.chars)
+            return true;
+
+        return memcmp(chars, other.chars, length * sizeof(*chars)) == 0;
+    }
+
+    UTILS_PROC bool operator!=(const String &other) const {
+        return !(*this == other);
+    }
 };
+
+String operator""_s(const char *chars, usize length) {
+    return String(const_cast<char *>(chars), length);
+}
 
 template <Allocator *allocator = nullptr> union String_Builder {
     struct {

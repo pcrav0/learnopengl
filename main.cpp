@@ -182,6 +182,24 @@ int main() {
                 assert(l0.remove(-1).head == -420);
                 assert(l0.remove().head == -69);
         }
+        {
+                auto t0 = Table<String, int>();
+
+                t0["hi"_s] = 5;
+                assert(t0["hi"_s] == 5);
+
+                t0["other"_s] = 3;
+                assert(t0["hi"_s]);
+                assert(t0["hi"_s] == 5);
+                assert(t0["other"_s]);
+                assert(t0["other"_s] == 3);
+
+                t0["hi"_s] = 69;
+                assert(t0["hi"_s]);
+                assert(t0["hi"_s] == 69);
+                assert(t0["other"_s]);
+                assert(t0["other"_s] == 3);
+        }
 
         printf("\nnice\n");
         return 0;
