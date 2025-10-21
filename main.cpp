@@ -267,6 +267,16 @@ int main() {
         for (auto &it : Reverse(l0)) {
             assert(l0[it.key] == it.value);
         }
+
+        assert(l0.is_sorted());
+    }
+    {
+        auto l0 = Table<String, int, [](const void *a, const void *b) {
+            return static_cast<const Pair<String, int> *>(a)->key.hash() -
+                   static_cast<const Pair<String, int> *>(b)->key.hash();
+        }>();
+        l0.put_many({{"nice"_s, 69}, {"wwoowwo"_s, 42}, {"poggers"_s, 1337}});
+        assert(l0.is_sorted());
     }
 
     puts("******");

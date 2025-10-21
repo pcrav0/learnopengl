@@ -179,19 +179,21 @@ template <typename T> struct Reverse {
 
 template <typename T, typename U> struct Pair {
     union {
-        T first;
+        // T first;
         T key;
-        T a;
-        T x;
+        // T a;
+        // T x;
     };
     union {
-        U second;
+        // U second;
         U value;
-        U b;
-        U y;
+        // U b;
+        // U y;
     };
 
-    UTILS_PROC_CONSTRUCT Pair(T a, U b) : a(a), b(b) {}
+    Pair(T key, U value) : key(key), value(value) {}
+
+    s64 operator<=>(const Pair &other) const { return key <=> other.key; }
 };
 
 template <typename T> struct Maybe {
@@ -262,22 +264,22 @@ template <typename T> struct Slice {
             return *this;
         }
 
-        UTILS_PROC iterator &operator++(T) {
-            iterator result = *this;
-            ++(*this);
-            return result;
-        }
+        // UTILS_PROC iterator &operator++(T) {
+        //     iterator result = *this;
+        //     ++(*this);
+        //     return result;
+        // }
 
         UTILS_PROC iterator &operator--() {
             --current;
             return *this;
         }
 
-        UTILS_PROC iterator &operator--(T) {
-            iterator result = *this;
-            --(*this);
-            return result;
-        }
+        // UTILS_PROC iterator &operator--(T) {
+        //     iterator result = *this;
+        //     --(*this);
+        //     return result;
+        // }
 
         UTILS_PROC T &operator*() { return *current; }
         UTILS_PROC T *operator->() { return current; }
@@ -312,14 +314,22 @@ template <typename T> struct Slice {
 
     UTILS_PROC T &operator[](usize index) const { return at(index); }
 
-    UTILS_PROC iterator begin() { return iterator(&at(0)); }
-    UTILS_PROC iterator end() { return iterator(&at_raw(length)); }
+    UTILS_PROC iterator begin() const { return iterator(&at(0)); }
+    UTILS_PROC iterator end() const { return iterator(&at_raw(length)); }
 
+    UTILS_PROC int hash() const {
+        int result = 6432;
+
+        for (const auto &it : *this) {
+            result += it << 5;
+        }
+
+        return result;
+    }
+
+    // https://en.wikipedia.org/wiki/Fowler–Noll–Vo_hash_function
     UTILS_PROC int operator<=>(const Slice &other) const {
-        if (length != other.length)
-            return length - other.length;
-
-        return std::memcmp(items, other.items, sizeof(T) * length);
+        return hash() - other.hash();
     }
 
     UTILS_PROC bool operator==(const Slice &other) const {
@@ -377,11 +387,64 @@ template <typename T> struct Slice {
         return *this;
     }
 
-    UTILS_PROC Slice sort() {
-        std::qsort(items, length, sizeof(T),
-                   [](const T *a, const T *b) -> int { return *a == *b; });
+    UTILS_PROC Slice sort(int (*cmp)(const void *a, const void *b) =
+                              [](const void *a, const void *b) -> int {
+        auto cmp = static_cast<const T *>(a) <=> static_cast<const T *>(b);
+        return *reinterpret_cast<int *>(&cmp);
+    }) {
+        std::qsort(items, length, sizeof(T), cmp);
 
         return *this;
+    }
+
+    UTILS_PROC bool is_sorted(bool left = true) const {
+        if (length <= 1)
+            return true;
+
+        for (uint i = 0; i < length - 1; i++) {
+            int cmp = at(i) <=> at(i + 1);
+            if ((left && cmp > 0) || (!left && cmp < 0))
+                return false;
+        }
+
+        return true;
+    }
+
+    UTILS_PROC usize sorted_index(const T &value) const {
+        UTILS_ASSERT(is_sorted(true) || is_sorted(false));
+
+        usize low = 0, high = length;
+
+        while (low < high) {
+            usize mid = (low + high) / 2;
+
+            if (at(mid) < value)
+                low = mid + 1;
+            else
+                high = mid;
+        }
+
+        return low;
+    }
+
+    UTILS_PROC Maybe<usize> binary_search(const T &value) const {
+        UTILS_ASSERT(is_sorted(true) || is_sorted(false));
+
+        usize low = 0, high = length;
+
+        while (low < high) {
+            usize mid = (low + high) / 2;
+
+            if (at(mid) == value)
+                return some(mid);
+
+            if (at(mid) < value)
+                low = mid + 1;
+            else
+                high = mid;
+        }
+
+        return none<usize>();
     }
 };
 
@@ -435,8 +498,9 @@ struct Array : public Slice<T> {
         return this->at_raw(index);
     }
 
-    UTILS_PROC void insert(T item, usize index) {
+    UTILS_PROC Array insert(T item, usize index) {
         insert_reserve(index) = item;
+        return *this;
     }
 
     UTILS_PROC T remove(ssize index) {
@@ -451,12 +515,24 @@ struct Array : public Slice<T> {
         return result;
     }
 
-    UTILS_PROC void push(T item) { insert(item, this->length); }
+    UTILS_PROC T &sorted_reserve(T item) {
+        return insert_reserve(this->sorted_index(item));
+    }
+
+    UTILS_PROC Array sorted_insert(T item) {
+        sorted_reserve(item) = item;
+        return *this;
+    }
+
+    UTILS_PROC Array push(T item) {
+        insert(item, this->length);
+        return *this;
+    }
     UTILS_PROC T &push_reserve() { return insert_reserve(this->length); }
 
     UTILS_PROC T pop() { return remove(-1); }
 
-    UTILS_PROC void unshift(T item) { insert(item, 0); }
+    UTILS_PROC Array unshift(T item) { return insert(item, 0); }
     UTILS_PROC T &unshift_reserve() { return insert_reserve(0); }
 
     UTILS_PROC T shift() { return remove(0); }
@@ -868,7 +944,14 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
     UTILS_PROC iterator end() { return iterator(&last_next()); }
 };
 
-template <typename Key, typename Value, Allocator *allocator = nullptr>
+template <typename Key, typename Value,
+          int (*cmp)(const void *, const void *) = [](const void *a,
+                                                      const void *b) -> int {
+              auto cmp = static_cast<const Pair<Key, Value> *>(a) <=>
+                         static_cast<const Pair<Key, Value> *>(b);
+              return *reinterpret_cast<int *>(&cmp);
+          },
+          Allocator *allocator = nullptr>
 struct Table : public Array<Pair<Key, Value>> {
     using Item = Pair<Key, Value>;
     struct iterator {
@@ -929,6 +1012,14 @@ struct Table : public Array<Pair<Key, Value>> {
         return none<Item *>();
     }
 
+    UTILS_PROC Table put_many(std::initializer_list<Item> items) {
+        this->reserve(items.size());
+        for (const auto &item : items)
+            this->push(item);
+        this->sort(cmp);
+        return *this;
+    }
+
     UTILS_PROC Table put(const Key &key, const Value &value) {
         if (auto it = search(key); it) {
             (*it)->value = value;
@@ -953,7 +1044,7 @@ struct Table : public Array<Pair<Key, Value>> {
 
         this->reserve(1);
 
-        Item *it = &this->push_reserve();
+        Item *it = &this->sorted_reserve(Item(key, {}));
         it->key = key;
         it->value = {};
         return it->value;
