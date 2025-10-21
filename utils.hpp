@@ -340,10 +340,10 @@ template <typename T> struct Slice {
 
     UTILS_PROC Slice splice(ssize start, ssize end) const {
         if (start < 0)
-            start += length;
+            start += length + 1;
 
         if (end < 0)
-            end += length;
+            end += length + 1;
 
         // UTILS_ASSERT(mod<ssize>(end, (length + 1)) >
         //              mod<ssize>(start, (length + 1)));
@@ -439,9 +439,14 @@ struct Array : public Slice<T> {
         insert_reserve(index) = item;
     }
 
-    UTILS_PROC T remove(usize index) {
+    UTILS_PROC T remove(ssize index) {
         T result = this->at(index);
-        this->splice(index, this->length).rotate(-1);
+
+        if (index < 0)
+            index += this->length + 1;
+
+        if (index != this->length)
+            this->splice(index, this->length).rotate(-2);
         this->length--;
         return result;
     }
@@ -1043,7 +1048,7 @@ struct Allocator_Malloc : public Allocator {
                 std::free(check_ptr);
 
                 // remove(i)
-                Slice<void *>(ptrs, length).splice(i, length).rotate(-1);
+                Slice<void *>(ptrs, length).splice(i, length).rotate(-2);
                 length--;
 
                 return nullptr;
