@@ -26,6 +26,10 @@
 #define UTILS_PROC_CONSTRUCT UTILS_PROC explicit
 #endif
 
+#ifndef UTILS_PROC_CONSTRUCT_IMPLICITY
+#define UTILS_PROC_CONSTRUCT_IMPLICITY UTILS_PROC
+#endif
+
 #ifndef UTILS_PROC_CONSTRUCT_COPY
 #define UTILS_PROC_CONSTRUCT_COPY UTILS_PROC
 #endif
@@ -191,7 +195,8 @@ template <typename T, typename U> struct Pair {
         // U y;
     };
 
-    Pair(T key, U value) : key(key), value(value) {}
+    UTILS_PROC_CONSTRUCT_IMPLICITY Pair(T key, U value)
+        : key(key), value(value) {}
 
     s64 operator<=>(const Pair &other) const { return key <=> other.key; }
 };
@@ -947,12 +952,12 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
 template <typename Key, typename Value,
           int (*cmp)(const void *, const void *) = [](const void *a,
                                                       const void *b) -> int {
-              auto cmp = static_cast<const Pair<Key, Value> *>(a) <=>
-                         static_cast<const Pair<Key, Value> *>(b);
+              auto cmp = static_cast<const Pair<Key, Value> *>(a)->key <=>
+                         static_cast<const Pair<Key, Value> *>(b)->key;
               return *reinterpret_cast<int *>(&cmp);
           },
           Allocator *allocator = nullptr>
-struct Table : public Array<Pair<Key, Value>> {
+struct Table : public Array<Pair<Key, Value>, allocator> {
     using Item = Pair<Key, Value>;
     struct iterator {
         Item *current;
@@ -1012,20 +1017,28 @@ struct Table : public Array<Pair<Key, Value>> {
         return none<Item *>();
     }
 
-    UTILS_PROC Table put_many(std::initializer_list<Item> items) {
-        this->reserve(items.size());
-        for (const auto &item : items)
-            this->push(item);
-        this->sort(cmp);
+    UTILS_PROC Table put(Item item) {
+        if (auto it = search(item.key); it) {
+            (*it)->value = item.value;
+        }
+
+        this->sorted_insert(item);
         return *this;
     }
 
-    UTILS_PROC Table put(const Key &key, const Value &value) {
-        if (auto it = search(key); it) {
-            (*it)->value = value;
+    UTILS_PROC Table put(std::initializer_list<Item> items) {
+        this->reserve(items.size());
+
+        for (const auto &item : items) {
+            if (auto it = search(item.key); it) {
+                (*it)->value = item.value;
+                continue;
+            }
+
+            this->push(item);
         }
 
-        this->push(Item(key, value));
+        this->sort(cmp);
         return *this;
     }
 

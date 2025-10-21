@@ -186,7 +186,7 @@ int main() {
         auto t0 = Table<String, int>();
 
         // t0["hi"_s] = 5;
-        t0.put("hi"_s, 5);
+        t0.put({"hi"_s, 5});
         assert(t0.get("hi"_s));
         assert(*t0.get("hi"_s) == 5);
 
@@ -271,12 +271,12 @@ int main() {
         assert(l0.is_sorted());
     }
     {
-        auto l0 = Table<String, int, [](const void *a, const void *b) {
-            return static_cast<const Pair<String, int> *>(a)->key.hash() -
-                   static_cast<const Pair<String, int> *>(b)->key.hash();
-        }>();
-        l0.put_many({{"nice"_s, 69}, {"wwoowwo"_s, 42}, {"poggers"_s, 1337}});
+        auto l0 = Table<String, int>();
+        l0.put({{"nice"_s, 69}, {"UwU"_s, 42}, {"poggers"_s, 1337}});
         assert(l0.is_sorted());
+        assert(l0["nice"_s] == 69);
+        assert(l0["UwU"_s] == 42);
+        assert(l0["poggers"_s] == 1337);
     }
 
     puts("******");
