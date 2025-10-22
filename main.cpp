@@ -13,8 +13,9 @@ String_Builder<> sb;
 
 GLFWwindow *window;
 
-uint vertex_buffer_object;
-uint vertex_array_object;
+uint vertex_buffer_object;   // vbo
+uint vertex_array_object;    // vao
+uint element_buffer_objects; // ebo
 
 uint vertex_shader;
 uint fragment_shader;
@@ -24,9 +25,15 @@ int success = 0;
 char info_log[512] = {0};
 
 float vertices[] = {
-    -0.5f, -0.5f, 0.0f, // a
-    0.5f,  -0.5f, 0.0f, // b
-    0.0f,  0.5f,  0.0f, // c
+    0.5f,  0.5f,  0.0f, // top right
+    0.5f,  -0.5f, 0.0f, // bottom right
+    -0.5f, -0.5f, 0.0f, // bottom left
+    -0.5f, 0.5f,  0.0f  // top left
+};
+unsigned int indices[] = {
+    // note that we start from 0!
+    0, 1, 3, // first triangle
+    1, 2, 3  // second triangle
 };
 
 void update() {
@@ -40,7 +47,7 @@ void draw() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     glfwSwapBuffers(window);
 }
@@ -165,6 +172,15 @@ int main(void) {
     glGenBuffers(1, &vertex_buffer_object);
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // fill the ebo
+    glGenBuffers(1, &element_buffer_objects);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_objects);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+                 GL_STATIC_DRAW);
+
+    // bind my indices
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_objects);
 
     // bind my attributes
     // layout (location = 0) in vec3 aPos;
