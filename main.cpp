@@ -39,14 +39,10 @@ char info_log[512] = {0};
 
 float vertices[] = {
     // pos -----------| color
-    // 0.5f,  0.5f,  0.0f, 1.0f, 0.0f, 0.0f, // top right
-    // 0.5f,  -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right
-    //-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom left
-    //-0.5f, 0.5f,  0.0f, 1.0f, 1.0f, 0.0f, // top left
-
-    0.5f,  -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, // bottom right
-    -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom left
-    0.0f,  0.5f,  0.0f, 0.0f, 0.0f, 1.0f  // top
+    0.5f,  0.5f,  0.0f, 1.0f, 0.0f, 0.0f, // top right
+    0.5f,  -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right
+    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom left
+    -0.5f, 0.5f,  0.0f, 1.0f, 1.0f, 0.0f, // top left
 };
 
 uint indices[] = {
@@ -75,8 +71,8 @@ void draw() {
     // wireframe mode
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    // glDrawElements(GL_TRIANGLES, ARRAY_LENGTH(indices), GL_UNSIGNED_INT, 0);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawElements(GL_TRIANGLES, ARRAY_LENGTH(indices), GL_UNSIGNED_INT, 0);
+    // glDrawArrays(GL_TRIANGLES, 0, 3);
 
     float f = min(abs(sin(current_time)) + 0.1f, 1.0f);
     glUniform4f(global_color, f, f, f, 1.0f);
@@ -93,31 +89,6 @@ void shader_check(const char *name, const String &source, uint shader) {
                info_log);
         exit(-1);
     }
-}
-
-String file_read(const char *file_path) {
-    usize start = sb.length;
-    FILE *file = fopen(file_path, "rb+");
-
-    long tell_old = ftell(file);
-    assert(tell_old >= 0);
-
-    fseek(file, 0, SEEK_END);
-    long tell_end = ftell(file);
-    assert(tell_end >= 0);
-
-    assert(tell_end >= tell_old);
-    fseek(file, tell_old, SEEK_SET);
-
-    long read_size = tell_end - tell_old;
-    if (read_size <= 0)
-        return String();
-
-    sb.reserve(read_size);
-    assert(fread(sb.items, 1, read_size, file) == read_size);
-    sb.length += read_size;
-
-    return String(sb.splice(start, -1));
 }
 
 int main(void) {
@@ -164,7 +135,7 @@ int main(void) {
     // create my shader
     vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     DEFER[] { glDeleteShader(vertex_shader); };
-    String vertex_shader_source = file_read("./vertex-shader.glsl");
+    String vertex_shader_source = file_read("./vertex-shader.glsl"_s, sb);
     glShaderSource(
         vertex_shader, 1, &vertex_shader_source.items,
         reinterpret_cast<const GLint *>(&vertex_shader_source.length));
@@ -172,12 +143,12 @@ int main(void) {
 
     shader_check("vertex", vertex_shader_source, vertex_shader);
 
-    sb.length = 0;
+    // sb.length = 0;
 
     // create my shader
     fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
     DEFER[] { glDeleteShader(fragment_shader); };
-    String fragment_shader_source = file_read("./fragment-shader.glsl");
+    String fragment_shader_source = file_read("./fragment-shader.glsl"_s, sb);
     glShaderSource(
         fragment_shader, 1, &fragment_shader_source.items,
         reinterpret_cast<const GLint *>(&fragment_shader_source.length));

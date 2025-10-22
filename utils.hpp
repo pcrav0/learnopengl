@@ -5,8 +5,11 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <stdio.h>
 
 #include <utility>
+
+#include <linux/limits.h> // MAX_PATH
 
 #define UTILS_IGNORE(...)
 
@@ -1094,17 +1097,30 @@ UTILS_PROC String operator""_s(const char *chars, usize length) {
     return String(const_cast<char *>(chars), length);
 }
 
-template <Allocator *allocator = nullptr>
-struct String_Builder : public Array<char, allocator> {
+template <Allocator *allocator = nullptr> struct String_Builder {
+    Array<char, allocator> chars;
+    Array<usize, allocator> control;
+
     UTILS_PROC String_Builder write(char c) {
-        this->push(c);
+        chars->push(c);
         return *this;
     }
 
     UTILS_PROC String_Builder write(const String &string) {
-        this->reserve(string.length);
-        memcpy(this->at(-1), string.items, sizeof(char) * string.length);
+        chars->reserve(string.length);
+        memcpy(chars->at(-1), string.items, sizeof(char) * string.length);
         return *this;
+    }
+
+    UTILS_PROC usize start() {
+        usize result = chars.length;
+        control.push(result);
+        return result;
+    }
+
+    UTILS_PROC String end() {
+        usize offset = control.pop();
+        return String(chars.splice(offset, -1));
     }
 };
 
@@ -1395,6 +1411,36 @@ template <typename T, Allocator *allocator = nullptr> struct Shared {
 
     UTILS_PROC_DESTRUCT ~Shared() { control->destroy(); }
 };
+
+String file_read(String file_path, String_Builder<> &sb) {
+    assert(file_path.length <= PATH_MAX);
+    static char path[PATH_MAX + 1] = {0};
+    memcpy(path, file_path.items, file_path.length);
+
+    FILE *file = fopen(path, "rb+");
+
+    long tell_old = ftell(file);
+    assert(tell_old >= 0);
+
+    fseek(file, 0, SEEK_END);
+    long tell_end = ftell(file);
+    assert(tell_end >= 0);
+
+    assert(tell_end >= tell_old);
+    fseek(file, tell_old, SEEK_SET);
+
+    long read_size = tell_end - tell_old;
+    if (read_size <= 0)
+        return String();
+
+    sb.start();
+    sb.chars.reserve(read_size);
+    assert(fread(sb.chars.items + sb.chars.length, 1, read_size, file) ==
+           read_size);
+    sb.chars.length += read_size;
+
+    return sb.end();
+}
 
 UTILS_PROC_INIT void _global_allocator_destroy_init() {
     static auto _allocator = Allocator_Malloc();
