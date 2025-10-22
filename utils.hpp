@@ -88,21 +88,36 @@ typedef uint64_t u64;
 typedef float f32;
 typedef double f64;
 
-#define VA_ARGS_HEAD(HEAD, ...) HEAD
-#define VA_ARGS_TAIL(_HEAD, ...) __VA_ARGS__
+#define UTILS_VA_ARGS_HEAD(HEAD, ...) HEAD
+#define UTILS_VA_ARGS_TAIL(_HEAD, ...) __VA_ARGS__
 
-#define _CONCAT(X, Y) X##Y
-#define CONCAT(X, Y) _CONCAT((X), (Y))
+#define UTILS__CONCAT(X, Y) X##Y
+#define UTILS_CONCAT(X, Y) UTILS__CONCAT(X, Y)
 
-#define _STRINGFY(X) #X
-#define STRINGFY(X) _STRINGFY((X))
+#define UTILS__STRINGFY(X) #X
+#define UTILS_STRINGFY(X) UTILS__STRINGFY(X)
 
-#define ARRAY_LENGTH(X) (sizeof((X)) / sizeof((X)[0]))
-#define BIG_NULL ((Big_Ptr){0})
+#define UTILS_ARRAY_LENGTH(X) (sizeof((X)) / sizeof((X)[0]))
 
-UTILS_PROC ssize ptr_diff(void *a, void *b) {
-    return reinterpret_cast<ssize>(a) - reinterpret_cast<ssize>(b);
-}
+template <typename F> struct _Defer {
+    F f;
+    _Defer(F f) : f(f) {}
+    ~_Defer() { f(); }
+};
+
+#define UTILS_DEFER                                                            \
+    utils::_Defer UTILS_CONCAT(UTILS_CONCAT(__defer__, __COUNTER__), __LINE__) =
+
+#ifdef UTILS_MACRO_RENAME
+#define VA_ARGS_HEAD UTILS_VA_ARGS_HEAD
+#define VA_ARGS_TAIL UTILS_VA_ARGS_TAIL
+#define CONCAT UTILS_CONCAT
+#define STRINGFY UTILS_STRINGFY
+#define ARRAY_LENGTH UTILS_ARRAY_LENGTH
+#define DEFER UTILS_DEFER
+#endif
+
+UTILS_PROC ssize ptr_diff(void *a, void *b);
 
 template <typename T> UTILS_PROC T min(T x) { return x; }
 
@@ -466,6 +481,10 @@ struct Array : public Slice<T> {
 
     // UTILS_PROC Array(std::initializer_list<T> values)
     //     : items{const_cast<T *>(values.begin())}, length{values.size()} {}
+
+    UTILS_PROC Slice<T> slice() const {
+        return Slice<T>(this->items, this->length);
+    }
 
     UTILS_PROC Array reserve(usize increment) {
         if (increment == 0)
@@ -952,9 +971,8 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
 template <typename Key, typename Value,
           int (*cmp)(const void *, const void *) = [](const void *a,
                                                       const void *b) -> int {
-              auto cmp = static_cast<const Pair<Key, Value> *>(a)->key <=>
-                         static_cast<const Pair<Key, Value> *>(b)->key;
-              return *reinterpret_cast<int *>(&cmp);
+              return static_cast<const Pair<Key, Value> *>(a)->key <=>
+                     static_cast<const Pair<Key, Value> *>(b)->key;
           },
           Allocator *allocator = nullptr>
 struct Table : public Array<Pair<Key, Value>, allocator> {
@@ -1065,6 +1083,9 @@ struct Table : public Array<Pair<Key, Value>, allocator> {
 };
 
 struct String : public Slice<char> {
+    UTILS_PROC_CONSTRUCT String() : Slice() {}
+    UTILS_PROC_CONSTRUCT String(Slice slice) : Slice(slice) {}
+
     UTILS_PROC_CONSTRUCT String(char *chars, usize length)
         : Slice(chars, length) {}
 };
@@ -1385,5 +1406,12 @@ UTILS_PROC_INIT void _global_allocator_destroy_init() {
 UTILS_PROC_FINI void _global_allocator_destroy_fini() {
     global_allocator->destroy();
 }
-
 } // namespace utils
+
+#ifdef UTILS_IMPLEMENT
+
+UTILS_PROC utils::ssize utils::ptr_diff(void *a, void *b) {
+    return reinterpret_cast<ssize>(a) - reinterpret_cast<ssize>(b);
+}
+
+#endif

@@ -1,34 +1,99 @@
-workspace("game") do
-   configurations{ "debug", "release" }
+function sh(cmd)
+   return io.popen(cmd):read('*a')
 end
 
-project("game") do
-   kind("ConsoleApp")
-   language("C++")
-   cppdialect("C++23")
-   targetdir("bin/%{cfg.buildcfg}")
-   toolset("clang")
+workspace('game') do
+   configurations{ 'debug', 'release' }
+   includedirs { './thirdparty/glad/include' }
 
-   files{ "**.hpp", "**.cpp" }
+   project('main') do
+      kind('ConsoleApp')
+      language('C++')
+      cppdialect('C++23')
+      targetdir('bin/%{cfg.buildcfg}')
+      toolset('clang')
 
-   linkbuildoutputs("On")
+      linkbuildoutputs('On')
 
-   filter{ "system:linux", "action:gmake" } do
-      buildoptions{ '-pipe' }
-      --buildoptions { "$$NIX_LDFLAGS", "-ansi", "-pedantic" }
-      --buildoptions { sh("pkg-config --cflags fmt"), '-pipe' }
-      --linkoptions { sh("pkg-config --libs fmt") }
+      libdirs { 'obj/%{cfg.buildcfg}' }
+
+      links{ 'glad' }
+      linkoptions{
+         '-lGL',
+         '-lglfw',
+
+         '-lX11',
+         '-lXrandr',
+         '-lXi',
+
+         '-lpthread',
+         '-ldl',
+      }
+
+      files{ 'utils.hpp', 'main.cpp', 'vertex-shader.h' }
+
+      filter('files:vertex_shaders.glsl') do
+         buildinputs{ 'vertex_shaders.glsl' }
+         buildaction('FxCompile')
+      end
+
+      filter{ 'system:linux', 'action:gmake' } do
+         buildoptions{ '-pipe' }
+      end
+
+      filter('configurations:debug') do
+         -- buildoptions{ '-fsanitize=memory', '-fno-omit-frame-pointer', '-fno-optimize-sibling-calls' }
+         -- linkoptions { sh('pkg-config --libs fmt') }
+         defines{ 'DEBUG=true' }
+         symbols('On')
+      end
+
+      filter('configurations:release') do
+         buildoptions{ '-fno-exceptions' }
+         defines{ 'DEBUG=false', 'RELEASE', 'UTILS_ASSERT=UTILS_IGNORE' }
+         optimize('On')
+      end
    end
 
+   project('glad') do
+      local loc = './thirdparty/glad/'
+      location(loc)
+      kind('StaticLib')
+      language('C')
+      targetdir('obj/%{cfg.buildcfg}')
+      toolset('gcc')
 
-   filter("configurations:debug") do
-      defines{ "DEBUG" }
-      symbols("On")
+      files{ loc..'/src/glad.c' }
+
+      filter('configurations:debug') do
+         defines{ 'DEBUG=true' }
+         symbols('On')
+      end
+
+      filter('configurations:release') do
+         defines{ 'DEBUG=false', 'RELEASE' }
+         optimize('On')
+      end
    end
 
-   filter("configurations:release") do
-      buildoptions{ '-fno-exceptions' }
-      defines{ "RELEASE", "UTILS_ASSERT=UTILS_IGNORE" }
-      optimize("On")
-   end
+   -- project('test') do
+   --    kind('ConsoleApp')
+   --    language('C++')
+   --    cppdialect('C++23')
+   --    targetdir('bin/%{cfg.buildcfg}')
+   --    toolset('clang')
+   --    linkbuildoutputs('On')
+
+   --    files{ 'utils.hpp', 'test.cpp' }
+
+   --    filter('configurations:debug') do
+   --       defines{ 'DEBUG' }
+   --       symbols('On')
+   --    end
+
+   --    filter('configurations:release') do
+   --       defines{ 'RELEASE' }
+   --       optimize('On')
+   --    end
+   -- end
 end

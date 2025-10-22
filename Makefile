@@ -9,26 +9,35 @@ ifndef verbose
 endif
 
 ifeq ($(config),debug)
-  game_config = debug
+  main_config = debug
+  glad_config = debug
 endif
 ifeq ($(config),release)
-  game_config = release
+  main_config = release
+  glad_config = release
 endif
 
-PROJECTS := game
+PROJECTS := main glad
 
 .PHONY: all clean help $(PROJECTS) 
 
 all: $(PROJECTS)
 
-game:
-ifneq (,$(game_config))
-	@echo "==== Building game ($(game_config)) ===="
-	@${MAKE} --no-print-directory -C . -f game.make config=$(game_config)
+main: glad
+ifneq (,$(main_config))
+	@echo "==== Building main ($(main_config)) ===="
+	@${MAKE} --no-print-directory -C . -f main.make config=$(main_config)
+endif
+
+glad:
+ifneq (,$(glad_config))
+	@echo "==== Building glad ($(glad_config)) ===="
+	@${MAKE} --no-print-directory -C thirdparty/glad -f Makefile config=$(glad_config)
 endif
 
 clean:
-	@${MAKE} --no-print-directory -C . -f game.make clean
+	@${MAKE} --no-print-directory -C . -f main.make clean
+	@${MAKE} --no-print-directory -C thirdparty/glad -f Makefile clean
 
 help:
 	@echo "Usage: make [config=name] [target]"
@@ -40,6 +49,7 @@ help:
 	@echo "TARGETS:"
 	@echo "   all (default)"
 	@echo "   clean"
-	@echo "   game"
+	@echo "   main"
+	@echo "   glad"
 	@echo ""
 	@echo "For more information, see https://github.com/premake/premake-core/wiki"

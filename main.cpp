@@ -1,287 +1,186 @@
+#define UTILS_MACRO_RENAME
 #include "utils.hpp"
-
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 using namespace utils;
 
-int main() {
-    {
-        int *p = alloc<int>();
-        assert(p != NULL);
-        *p = 5;
-        assert(*p == 5);
+#include <stdio.h>
 
-        int *p0 = alloc<int>(100);
-        assert(p0 != nullptr);
+#include <glad/glad.h>
 
-        int *q = realloc(p, 1, 10);
-        assert(p != q);
-        q[1] = 8;
-        assert(q[0] == 5);
-        assert(q[1] == 8);
-    }
-    {
-        int *p = alloc<int>();
-        *p = 69;
+#include <GLFW/glfw3.h>
 
-        auto u0 = Unique<int>(p, 1);
-        int *u0_ptr = u0.addr();
-        assert(u0.addr() == p);
-        auto u1 = std::move(u0);
-        assert(u0.addr() == nullptr);
-        assert(u1.addr() == u0_ptr);
-        u1.destroy();
-        assert(u1.addr() == u0.addr());
-        assert(u1.addr() == nullptr);
+String_Builder<> sb;
 
-        int *q = alloc<int>();
-        *q = 420;
-        auto s0 = Shared<int>(q, 1);
-        assert(s0.addr() == q);
-        assert(s0.counter() == 1);
+GLFWwindow *window;
 
-        auto s1 = s0;
-        assert(s0.addr() == s1.addr());
-        assert(s1.addr() != nullptr);
+uint vertex_buffer_object;
+uint vertex_array_object;
 
-        assert(s0.counter() == s1.counter());
-        assert(s1.counter() == 2);
+uint vertex_shader;
+uint fragment_shader;
+uint program_shader;
 
-        // s1.destroy();
+int success = 0;
+char info_log[512] = {0};
 
-        // assert(s0.addr() == s1.addr());
-        // assert(s1.addr() != nullptr);
+float vertices[] = {
+    -0.5f, -0.5f, 0.0f, // a
+    0.5f,  -0.5f, 0.0f, // b
+    0.0f,  0.5f,  0.0f, // c
+};
 
-        // assert(*s0.counter() == *s1.counter());
-        // assert(*s1.counter() == 1);
+void update() {
+    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
 
-        // s1.destroy();
-
-        // assert(*s0.counter() == *s1.counter());
-        // assert(*s0.counter() == 0);
-    }
-    {
-        Array<int> a;
-        a.push(2);
-        a.push(3);
-        a.push(69);
-
-        assert(a.length == 3);
-        assert(a[0] == 2);
-        assert(a[1] == 3);
-        assert(a[2] == 69);
-
-        assert(a.shift() == 2);
-        assert(a.length == 2);
-        assert(a[0] == 3);
-        assert(a[1] == 69);
-
-        assert(a.pop() == 69);
-        assert(a.length == 1);
-        assert(a[0] == 3);
-    }
-    {
-        List<int> l0;
-        assert(l0.length() == 0);
-
-        l0.prepend(3);
-        assert(l0.length() == 1);
-        assert(l0.at(0).head == 3);
-
-        l0.prepend(69);
-        assert(l0.length() == 2);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 3);
-
-        l0.append(420);
-        assert(l0.length() == 3);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 3);
-        assert(l0.at(2).head == 420);
-
-        l0.append(42);
-        assert(l0.length() == 4);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 3);
-        assert(l0.at(2).head == 420);
-        assert(l0.at(3).head == 42);
-
-        l0.prepend(-1);
-        l0.forward();
-        assert(l0.length() == 4);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 3);
-        assert(l0.at(2).head == 420);
-        assert(l0.at(3).head == 42);
-
-        l0.remove(1);
-        assert(l0.length() == 3);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 420);
-        assert(l0.at(2).head == 42);
-
-        l0.remove(2);
-        assert(l0.length() == 2);
-        assert(l0.at(0).head == 69);
-        assert(l0.at(1).head == 420);
-
-        l0.forward();
-        assert(l0.length() == 1);
-        assert(l0.at(0).head == 420);
-
-        l0.forward();
-        assert(l0.length() == 0);
-    }
-    {
-        auto l0 = Double_List<int>();
-        assert(l0.length_next() == 0);
-        assert(l0.length_prev() == 0);
-        assert(l0.length() == 0);
-
-        l0.prepend_next(420);
-        assert(l0.length_next() == 0);
-        assert(l0.length_prev() == 0);
-        assert(l0.length() == 1);
-
-        l0.prepend_next(69);
-        assert(l0.length_next() == 1);
-        assert(l0.length_prev() == 0);
-        assert(l0.length() == 2);
-
-        l0.prepend_next(-420);
-        assert(l0.length_next() == 2);
-        assert(l0.length_prev() == 0);
-        assert(l0.length() == 3);
-
-        l0.prepend_prev(-69);
-        assert(l0.length_next() == 2);
-        assert(l0.length_prev() == 1);
-        assert(l0.length() == 4);
-
-        l0.prepend_prev(2);
-        assert(l0.length_next() == 2);
-        assert(l0.length_prev() == 2);
-        assert(l0.length() == 5);
-
-        assert(l0.at(-2).head == -420);
-        assert(l0.at(-1).head == -69);
-        assert(l0.at(0).head == 2);
-        assert(l0.at(1).head == 69);
-        assert(l0.at(2).head == 420);
-
-        l0.append_next(911);
-        l0.append_prev(-911);
-        assert(l0.remove(3).head == 911);
-        assert(l0.remove(-3).head == -911);
-
-        assert(l0.forward().head == 2);
-        assert(l0.remove(1).head == 420);
-        assert(l0.backward().head == 69);
-        assert(l0.remove(-1).head == -420);
-        assert(l0.remove().head == -69);
-    }
-    {
-        auto t0 = Table<String, int>();
-
-        // t0["hi"_s] = 5;
-        t0.put({"hi"_s, 5});
-        assert(t0.get("hi"_s));
-        assert(*t0.get("hi"_s) == 5);
-
-        t0["other"_s] = 3;
-        assert(t0["hi"_s] == 5);
-        assert(t0["other"_s] == 3);
-
-        t0["hi"_s] = 69;
-        assert(t0["hi"_s] == 69);
-        assert(t0["other"_s] == 3);
-    }
-    {
-        int i = 0;
-        const int end = 5;
-        auto l0 = Array<int>();
-        l0.reserve(abs(end - i));
-        for (int it = i; it < end; it++)
-            l0.push(it);
-
-        for (auto &it : l0) {
-            assert(it == i++);
-        }
-
-        assert(i == end);
-        for (auto &it : Reverse(l0)) {
-            assert(it == --i);
-        }
-    }
-    {
-        int i = 0;
-        const int end = 5;
-        auto l0 = List<int>();
-        for (int it = i; it < end; it++)
-            l0.append(it);
-
-        for (auto &it : l0) {
-            assert(it.head == i++);
-        }
-    }
-    {
-        int i = 1;
-        const int end = 5;
-        auto l0 = Double_List<int>();
-        l0.prepend_next(0);
-
-        for (int it = i; it < end / 2 + 1; it++)
-            l0.append_next(it);
-
-        for (int it = i; it < end / 2 + 1; it++)
-            l0.append_prev(-it);
-
-        i = -(end / 2);
-        for (auto &it : l0) {
-            assert(it.head == i++);
-        }
-
-        assert(i == end / 2);
-        for (auto &it : Reverse(l0)) {
-            assert(it.head == --i);
-        }
-    }
-    {
-        int i = 0;
-        const int end = 5;
-
-        auto l0 = Table<String, int>();
-        String keys[end] = {"foo"_s, "bar"_s, "buzz"_s, "quux"_s, "xyzzy"_s};
-
-        l0.reserve(abs(end - i));
-        for (int it = i; it < end; it++) {
-            l0[keys[it]] = it;
-        }
-
-        for (auto &it : l0) {
-            assert(l0[it.key] == it.value);
-        }
-
-        for (auto &it : Reverse(l0)) {
-            assert(l0[it.key] == it.value);
-        }
-
-        assert(l0.is_sorted());
-    }
-    {
-        auto l0 = Table<String, int>();
-        l0.put({{"nice"_s, 69}, {"UwU"_s, 42}, {"poggers"_s, 1337}});
-        assert(l0.is_sorted());
-        assert(l0["nice"_s] == 69);
-        assert(l0["UwU"_s] == 42);
-        assert(l0["poggers"_s] == 1337);
-    }
-
-    puts("******");
-    printf("nice\n");
-    return 0;
+    glfwPollEvents();
 }
 
-int $a = 3;
+void draw() {
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    glfwSwapBuffers(window);
+}
+
+void shader_check(const char *name, const String &source, uint shader) {
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+
+    if (!success) {
+        glGetShaderInfoLog(shader, 512, NULL, info_log);
+        printf("cant compile this stupid %s shader because: %s\n", name,
+               info_log);
+        exit(-1);
+    }
+}
+
+String file_read(const char *file_path) {
+    usize start = sb.length;
+    FILE *file = fopen(file_path, "rb+");
+
+    long tell_old = ftell(file);
+    assert(tell_old >= 0);
+
+    fseek(file, 0, SEEK_END);
+    long tell_end = ftell(file);
+    assert(tell_end >= 0);
+
+    assert(tell_end >= tell_old);
+    fseek(file, tell_old, SEEK_SET);
+
+    long read_size = tell_end - tell_old;
+    if (read_size <= 0)
+        return String();
+
+    sb.reserve(read_size);
+    assert(fread(sb.items, 1, read_size, file) == read_size);
+    sb.length += read_size;
+
+    return String(sb.splice(start, -1));
+}
+
+int main(void) {
+    if (!glfwInit())
+        return -1;
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_CENTER_CURSOR, true);
+
+    glfwWindowHint(GLFW_CONTEXT_DEBUG, DEBUG);
+    glfwWindowHint(GLFW_RESIZABLE, DEBUG);
+    glfwWindowHint(GLFW_FLOATING, DEBUG);
+    glfwWindowHint(GLFW_MAXIMIZED, !DEBUG);
+
+#ifdef DEBUG
+    glfwWindowHintString(GLFW_X11_CLASS_NAME, "#DEBUG");
+    glfwWindowHintString(GLFW_X11_INSTANCE_NAME, "#DEBUG");
+#endif
+
+    window = glfwCreateWindow(640, 480, "learnopengl.com", NULL, NULL);
+    DEFER[] { glfwTerminate(); };
+
+    if (!window) {
+        return -1;
+    }
+
+    glfwMakeContextCurrent(window);
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        return -1;
+    }
+
+    glViewport(0, 0, 640, 480);
+    glfwSetFramebufferSizeCallback(
+        window, [](GLFWwindow *window, int width, int height) {
+            glViewport(0, 0, width, height);
+        });
+
+    // create my shader
+    vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    DEFER[] { glDeleteShader(vertex_shader); };
+    String vertex_shader_source = file_read("./vertex-shader.glsl");
+    glShaderSource(
+        vertex_shader, 1, &vertex_shader_source.items,
+        reinterpret_cast<const GLint *>(&vertex_shader_source.length));
+    glCompileShader(vertex_shader);
+
+    shader_check("vertex", vertex_shader_source, vertex_shader);
+
+    sb.length = 0;
+
+    // create my shader
+    fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    DEFER[] { glDeleteShader(fragment_shader); };
+    String fragment_shader_source = file_read("./fragment-shader.glsl");
+    glShaderSource(
+        fragment_shader, 1, &fragment_shader_source.items,
+        reinterpret_cast<const GLint *>(&fragment_shader_source.length));
+    glCompileShader(fragment_shader);
+
+    shader_check("frament", fragment_shader_source, fragment_shader);
+
+    // create my program
+    program_shader = glCreateProgram();
+    glAttachShader(program_shader, vertex_shader);
+    glAttachShader(program_shader, fragment_shader);
+    glLinkProgram(program_shader);
+
+    // cant link / create my program?
+    glGetProgramiv(program_shader, GL_LINK_STATUS, &success);
+    if (!success) {
+        glGetProgramInfoLog(program_shader, 512, NULL, info_log);
+        printf("cant link this stupid program because: `%s`\n", info_log);
+        return -1;
+    }
+
+    // bind my vertex array
+    glGenVertexArrays(1, &vertex_array_object);
+    glBindVertexArray(vertex_array_object);
+
+    // fill my vertex buffer with shit
+    glGenBuffers(1, &vertex_buffer_object);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // bind my attributes
+    // layout (location = 0) in vec3 aPos;
+    glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, (void *)0);
+    glEnableVertexAttribArray(0);
+
+    // use my shader
+    glUseProgram(program_shader);
+
+    // with my vao
+    glBindVertexArray(vertex_array_object);
+
+    while (!glfwWindowShouldClose(window)) {
+        update();
+        draw();
+    }
+
+    return 0;
+}
