@@ -1101,11 +1101,9 @@ struct String_Builder : public Array<char, allocator> {
         return *this;
     }
 
-    UTILS_PROC String_Builder write(String string) {
-        for (char i = 0; i < string.length; i++) {
-            write(string[i]);
-        }
-
+    UTILS_PROC String_Builder write(const String &string) {
+        this->reserve(string.length);
+        memcpy(this->at(-1), string.items, sizeof(char) * string.length);
         return *this;
     }
 };

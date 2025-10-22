@@ -75,25 +75,24 @@ workspace('game') do
          optimize('On')
       end
    end
+end
 
-   -- project('test') do
-   --    kind('ConsoleApp')
-   --    language('C++')
-   --    cppdialect('C++23')
-   --    targetdir('bin/%{cfg.buildcfg}')
-   --    toolset('clang')
-   --    linkbuildoutputs('On')
+workspace('test') do
+   configurations{ 'test' }
 
-   --    files{ 'utils.hpp', 'test.cpp' }
+   project('test') do
+      kind('ConsoleApp')
+      language('C++')
+      cppdialect('C++23')
+      targetdir('bin/%{cfg.buildcfg}')
+      toolset('clang')
+      linkbuildoutputs('On')
 
-   --    filter('configurations:debug') do
-   --       defines{ 'DEBUG' }
-   --       symbols('On')
-   --    end
+      files{ 'test.cpp', 'utils.hpp', }
 
-   --    filter('configurations:release') do
-   --       defines{ 'RELEASE' }
-   --       optimize('On')
-   --    end
-   -- end
+      filter('configurations:test') do
+         defines{ 'DEBUG' }
+         symbols('On')
+      end
+   end
 end

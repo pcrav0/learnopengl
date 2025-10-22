@@ -3,42 +3,67 @@
 
 using namespace utils;
 
+#include <math.h>
 #include <stdio.h>
 
 #include <glad/glad.h>
 
 #include <GLFW/glfw3.h>
 
+// memory
 String_Builder<> sb;
 
+// os
 GLFWwindow *window;
+float current_time;
 
+// gl buffers
 uint vertex_buffer_object;   // vbo
 uint vertex_array_object;    // vao
 uint element_buffer_objects; // ebo
 
+// shaders
 uint vertex_shader;
 uint fragment_shader;
 uint program_shader;
 
+// machine config
+
+GLint max_vertex_attributes;
+
+// error setup
 int success = 0;
 char info_log[512] = {0};
 
+// index
+
 float vertices[] = {
-    0.5f,  0.5f,  0.0f, // top right
-    0.5f,  -0.5f, 0.0f, // bottom right
-    -0.5f, -0.5f, 0.0f, // bottom left
-    -0.5f, 0.5f,  0.0f  // top left
+    // pos -----------| color
+    // 0.5f,  0.5f,  0.0f, 1.0f, 0.0f, 0.0f, // top right
+    // 0.5f,  -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right
+    //-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom left
+    //-0.5f, 0.5f,  0.0f, 1.0f, 1.0f, 0.0f, // top left
+
+    0.5f,  -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, // bottom right
+    -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom left
+    0.0f,  0.5f,  0.0f, 0.0f, 0.0f, 1.0f  // top
 };
-unsigned int indices[] = {
-    // note that we start from 0!
+
+uint indices[] = {
     0, 1, 3, // first triangle
     1, 2, 3  // second triangle
 };
 
+// uniforms
+int global_color;
+
+// procs
+
 void update() {
     if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    current_time = glfwGetTime();
 
     glfwPollEvents();
 }
@@ -47,7 +72,14 @@ void draw() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    // wireframe mode
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // glDrawElements(GL_TRIANGLES, ARRAY_LENGTH(indices), GL_UNSIGNED_INT, 0);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    float f = min(abs(sin(current_time)) + 0.1f, 1.0f);
+    glUniform4f(global_color, f, f, f, 1.0f);
 
     glfwSwapBuffers(window);
 }
@@ -120,6 +152,9 @@ int main(void) {
         return -1;
     }
 
+    glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &max_vertex_attributes);
+    printf("[*] max vertex attributes = %d\n", max_vertex_attributes);
+
     glViewport(0, 0, 640, 480);
     glfwSetFramebufferSizeCallback(
         window, [](GLFWwindow *window, int width, int height) {
@@ -164,6 +199,13 @@ int main(void) {
         return -1;
     }
 
+    // bind uniforms
+    global_color = glGetUniformLocation(program_shader, "global_color");
+    if (global_color < 0) {
+        printf("[-] cant find `global_color` uniform, sorry :(\n");
+        // return -1;
+    }
+
     // bind my vertex array
     glGenVertexArrays(1, &vertex_array_object);
     glBindVertexArray(vertex_array_object);
@@ -183,15 +225,20 @@ int main(void) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_objects);
 
     // bind my attributes
+
     // layout (location = 0) in vec3 aPos;
-    glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, (void *)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, false,
+                          ARRAY_LENGTH(indices) * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
+
+    // layout (location = 1) in vec4 color;
+    glVertexAttribPointer(1, 3, GL_FLOAT, false,
+                          ARRAY_LENGTH(indices) * sizeof(float),
+                          (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
     // use my shader
     glUseProgram(program_shader);
-
-    // with my vao
-    glBindVertexArray(vertex_array_object);
 
     while (!glfwWindowShouldClose(window)) {
         update();
