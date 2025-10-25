@@ -10,72 +10,17 @@ using namespace utils;
 
 #include <GLFW/glfw3.h>
 
-// os
-GLFWwindow *window;
-float current_time;
-
-// gl buffers
-uint vertex_buffer_object;   // vbo
-uint vertex_array_object;    // vao
-uint element_buffer_objects; // ebo
-
-// shaders
-uint program_shader;
-
-// machine config
-
-GLint max_vertex_attributes;
-
-// index
-
-float vertices[] = {
-    // pos -----------| color
-    0.5f,  0.5f,  0.0f, 1.0f, 0.0f, 0.0f, // top right
-    0.5f,  -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right
-    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom left
-    -0.5f, 0.5f,  0.0f, 1.0f, 1.0f, 0.0f, // top left
-};
-
-uint indices[] = {
-    0, 1, 3, // first triangle
-    1, 2, 3  // second triangle
-};
-
-// uniforms
-int global_color;
-
-// static buffers
-static constexpr usize uniform_name_size = 512;
-static char uniform_name[uniform_name_size + 1];
-
 // structs
 struct Shader {
-    uint id;
+    GLint id = -1;
 
     static constexpr usize info_log_size = 512;
 
-    static void compile(uint shader, const String &file_path,
-                        String_Builder<> &sb) {
-        String source = file_read(file_path, sb);
+    explicit Shader() : id(-1) {}
 
-        glShaderSource(shader, 1, &source.items,
-                       reinterpret_cast<const GLint *>(&source.length));
-        glCompileShader(shader);
-
-        int success;
-        char info_log[info_log_size] = {0};
-
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-        if (!success) {
-            glGetShaderInfoLog(shader, 512, NULL, info_log);
-            printf("cant compile this stupid %s shader because: %s\n",
-                   file_path, info_log);
-            exit(-1);
-        }
-    }
-
-    Shader(const String &vertex_shader_file_path,
-           const String &fragment_shader_file_path, String_Builder<> &sb) {
+    explicit Shader(const String &vertex_shader_file_path,
+                    const String &fragment_shader_file_path,
+                    String_Builder<> &sb) {
         uint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
         DEFER[=] { glDeleteShader(vertex_shader); };
         compile(vertex_shader, vertex_shader_file_path, sb);
@@ -99,19 +44,84 @@ struct Shader {
         }
     }
 
+    static void compile(uint shader, const String &file_path,
+                        String_Builder<> &sb) {
+        String source = file_read(file_path, sb);
+
+        glShaderSource(shader, 1, &source.items,
+                       reinterpret_cast<const GLint *>(&source.length));
+        glCompileShader(shader);
+
+        int success;
+        char info_log[info_log_size] = {0};
+
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+        if (!success) {
+            glGetShaderInfoLog(shader, 512, NULL, info_log);
+            printf("cant compile this stupid %s shader because: %s\n",
+                   file_path.zstr(), info_log);
+            exit(-1);
+        }
+    }
+
     void use() const { glUseProgram(id); }
 
     GLint bind(const String &name) const {
-        assert(name.length < uniform_name_size);
-        memset(uniform_name, 0, uniform_name_size);
-        memcpy(uniform_name, name.items, name.length);
+        GLint result = glGetUniformLocation(id, name.zstr());
 
-        GLint result = glGetUniformLocation(id, uniform_name);
         if (result < 0)
-            printf("[-] cant find `global_color` uniform, sorry :(\n");
+            printf("[-] cant find `%s` uniform, sorry :(\n", name.zstr());
 
         return result;
     }
+
+    void set4f(const String &name, float x, float y, float z, float w) {
+        glUniform4f(bind(name), x, y, z, w);
+    }
+};
+
+// os
+GLFWwindow *window;
+float current_time;
+
+// gl buffers
+uint quad_vertex_buffer_object;   // vbo
+uint quad_vertex_array_object;    // vao
+uint quad_element_buffer_objects; // ebo
+
+uint texture_vertex_buffer_object;   // vbo
+uint texture_vertex_array_object;    // vao
+uint texture_element_buffer_objects; // ebo
+
+// shaders
+Shader quad_shader;
+Shader texture_shader;
+
+// machine config
+
+GLint max_vertex_attributes;
+// index
+
+float texture_vertices[] = {
+    // pos ---------- |
+    -0.5f, -0.5f, +0.0f, // top right
+    +0.5f, -0.5f, +0.0f, // bottom right
+    +0.0f, +0.5f, +0.0f, // bottom left
+};
+
+uint texture_indices[] = {0, 1, 2};
+
+float quad_vertices[] = {
+    // pos ---------- | color --------- |
+    0.5f,  0.5f,  0.0f, 1.0f, 0.0f, 0.0f, // top right
+    0.5f,  -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right
+    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom left
+    -0.5f, 0.5f,  0.0f, 1.0f, 1.0f, 0.0f, // top left
+};
+
+uint quad_indices[] = {
+    0, 1, 3, // first triangle
+    1, 2, 3  // second triangle
 };
 
 // procs
@@ -128,15 +138,27 @@ void draw() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
+    // draw quad
+    glBindVertexArray(quad_vertex_array_object);
+    quad_shader.use();
+
     // wireframe mode
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    glDrawElements(GL_TRIANGLES, ARRAY_LENGTH(indices), GL_UNSIGNED_INT, 0);
-    // glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawElements(GL_TRIANGLES, ARRAY_LENGTH(quad_indices), GL_UNSIGNED_INT,
+                   0);
 
     float f = min(abs(sin(current_time)) + 0.1f, 1.0f);
-    glUniform4f(global_color, f, f, f, 1.0f);
+    quad_shader.set4f("global_color"_s, f, f, f, 1.0f);
 
+    // draw texture
+    glBindVertexArray(texture_vertex_array_object);
+    texture_shader.use();
+
+    glDrawElements(GL_TRIANGLES, ARRAY_LENGTH(texture_indices), GL_UNSIGNED_INT,
+                   0);
+
+    // end
     glfwSwapBuffers(window);
 }
 
@@ -183,46 +205,76 @@ int main(void) {
             glViewport(0, 0, width, height);
         });
 
-    // create my program
-    auto program_shader =
-        Shader("./vertex-shader.glsl"_s, "./fragment-shader.glsl"_s, sb);
+    // create shaders program
+    quad_shader = Shader("./vertex-shader-quad.glsl"_s,
+                         "./fragment-shader-quad.glsl"_s, sb);
 
-    // bind uniforms
-    global_color = program_shader.bind("global_color"_s);
+    texture_shader = Shader("./vertex-shader-texture.glsl"_s,
+                            "./fragment-shader-texture.glsl"_s, sb);
 
-    // bind my vertex array
-    glGenVertexArrays(1, &vertex_array_object);
-    glBindVertexArray(vertex_array_object);
+    { // quad
+        // create my buffers
+        glGenBuffers(1, &quad_vertex_buffer_object);
+        glGenVertexArrays(1, &quad_vertex_array_object);
+        glGenBuffers(1, &quad_element_buffer_objects);
 
-    // fill my vertex buffer with shit
-    glGenBuffers(1, &vertex_buffer_object);
-    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+        // bind my vertex array
+        glBindVertexArray(quad_vertex_array_object);
 
-    // fill the ebo
-    glGenBuffers(1, &element_buffer_objects);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_objects);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
-                 GL_STATIC_DRAW);
+        // fill my vertex buffer with shit
+        glBindBuffer(GL_ARRAY_BUFFER, quad_vertex_buffer_object);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), quad_vertices,
+                     GL_STATIC_DRAW);
 
-    // bind my indices
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_objects);
+        // fill the ebo
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad_element_buffer_objects);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quad_indices),
+                     quad_indices, GL_STATIC_DRAW);
 
-    // bind my attributes
+        // bind my quad_indices
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad_element_buffer_objects);
 
-    // layout (location = 0) in vec3 aPos;
-    glVertexAttribPointer(0, 3, GL_FLOAT, false,
-                          ARRAY_LENGTH(indices) * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(0);
+        // layout (location = 0) in vec3 aPos;
+        glVertexAttribPointer(0, 3, GL_FLOAT, false,
+                              ARRAY_LENGTH(quad_indices) * sizeof(float),
+                              (void *)0);
+        glEnableVertexAttribArray(0);
 
-    // layout (location = 1) in vec4 color;
-    glVertexAttribPointer(1, 3, GL_FLOAT, false,
-                          ARRAY_LENGTH(indices) * sizeof(float),
-                          (void *)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+        // layout (location = 1) in vec4 color;
+        glVertexAttribPointer(1, 3, GL_FLOAT, false,
+                              ARRAY_LENGTH(quad_indices) * sizeof(float),
+                              (void *)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+    }
 
-    // use my shader
-    program_shader.use();
+    // unbind
+    glBindVertexArray(0);
+
+    { // texture
+        glGenBuffers(1, &texture_vertex_buffer_object);
+        glGenVertexArrays(1, &texture_vertex_array_object);
+        glGenBuffers(1, &texture_element_buffer_objects);
+
+        glBindVertexArray(texture_vertex_array_object);
+
+        glBindBuffer(GL_ARRAY_BUFFER, texture_vertex_buffer_object);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(texture_vertices),
+                     texture_vertices, GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, texture_element_buffer_objects);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(texture_indices),
+                     texture_indices, GL_STATIC_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, texture_element_buffer_objects);
+
+        // layout (location = 0) in vec3 aPos;
+        glVertexAttribPointer(0, 3, GL_FLOAT, false,
+                              ARRAY_LENGTH(texture_indices) * sizeof(float),
+                              (void *)0);
+        glEnableVertexAttribArray(0);
+    }
+
+    // unbind
+    glBindVertexArray(0);
 
     while (!glfwWindowShouldClose(window)) {
         update();

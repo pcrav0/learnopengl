@@ -425,7 +425,7 @@ template <typename T> struct Slice {
             return true;
 
         for (uint i = 0; i < length - 1; i++) {
-            int cmp = at(i) <=> at(i + 1);
+            auto cmp = at(i) <=> at(i + 1);
             if ((left && cmp > 0) || (!left && cmp < 0))
                 return false;
         }
@@ -503,9 +503,9 @@ struct Array : public Slice<T> {
             return *this;
 
         usize old_size = capacity;
-        do {
+        while (this->length + increment > capacity) {
             capacity *= 2;
-        } while (capacity < this->length + increment);
+        }
         usize new_size = capacity;
         this->items = realloc<T>(this->items, old_size, new_size, allocator);
         return *this;
@@ -702,7 +702,8 @@ template <typename T, Allocator *allocator = nullptr> struct List {
     UTILS_PROC iterator begin() { return iterator(node); }
     UTILS_PROC iterator end() { return iterator(nullptr); }
 
-    // TODO: bool has_cycle() {...}
+    // https://cp-algorithms.com/others/tortoise_and_hare.html
+    // TODO: bool has_cycle() {...} //
     // TODO: List chain() {...} // create a cycle
 };
 
@@ -1091,6 +1092,14 @@ struct String : public Slice<char> {
 
     UTILS_PROC_CONSTRUCT String(char *chars, usize length)
         : Slice(chars, length) {}
+
+    UTILS_PROC char *zstr() const {
+        static char result[1024] = {0};
+        UTILS_ASSERT(this->length <= sizeof(result));
+        memset(result, 0, sizeof(result));
+        memcpy(result, this->items, this->length);
+        return result;
+    };
 };
 
 UTILS_PROC String operator""_s(const char *chars, usize length) {

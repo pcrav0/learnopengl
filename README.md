@@ -36,3 +36,7 @@ make verbose=true config=release -j$(nproc)
 make verbose=true config=release -j$(nproc)
 ./bin/test/game
 ```
+
+# credits
+- https://gist.github.com/MangaD/fde1290be3e8b362ed524117382e9a47
+- https://github.com/Javier-varez/Ditto
