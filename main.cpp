@@ -1,3 +1,5 @@
+#include "stb_image.h"
+
 #define UTILS_MACRO_RENAME
 #include "utils.hpp"
 
@@ -103,26 +105,33 @@ GLint max_vertex_attributes;
 // index
 
 float texture_vertices[] = {
-    // pos ---------- |
-    -0.5f, -0.5f, +0.0f, // top right
-    +0.5f, -0.5f, +0.0f, // bottom right
-    +0.0f, +0.5f, +0.0f, // bottom left
+    // pos ----------- | color ------------ | texture coord
+    +0.5f, +0.5f, +0.0f, +0.5f, +0.5f, +0.5f, +1.0f, +1.0f, // top right
+    +0.5f, -0.5f, +0.0f, +0.0f, +1.0f, +1.0f, +1.0f, +0.0f, // bottom right
+    -0.5f, -0.5f, +0.0f, +0.0f, +0.0f, +1.0f, +0.0f, +0.0f, // bottom left
+    -0.5f, +0.5f, +0.0f, +1.0f, +0.3f, +1.0f, +0.0f, +1.0f, // top left
 };
 
-uint texture_indices[] = {0, 1, 2};
+uint texture_indices[] = {
+    0, 1, 3, // first triangle
+    1, 2, 3, // second triangle
+};
 
 float quad_vertices[] = {
     // pos ---------- | color --------- |
-    0.5f,  0.5f,  0.0f, 1.0f, 0.0f, 0.0f, // top right
-    0.5f,  -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right
-    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom left
-    -0.5f, 0.5f,  0.0f, 1.0f, 1.0f, 0.0f, // top left
+    1.0f,  1.0f,  0.0f, 1.0f, 0.0f, 0.0f, // top right
+    1.0f,  -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right
+    -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom left
+    -1.0f, 1.0f,  0.0f, 1.0f, 1.0f, 0.0f, // top left
 };
 
 uint quad_indices[] = {
     0, 1, 3, // first triangle
-    1, 2, 3  // second triangle
+    1, 2, 3, // second triangle
 };
+
+// texture
+uint texture_map;
 
 // procs
 void update() {
@@ -138,15 +147,14 @@ void draw() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // draw quad
+    // // draw quad
     glBindVertexArray(quad_vertex_array_object);
     quad_shader.use();
 
     // wireframe mode
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    glDrawElements(GL_TRIANGLES, ARRAY_LENGTH(quad_indices), GL_UNSIGNED_INT,
-                   0);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     float f = min(abs(sin(current_time)) + 0.1f, 1.0f);
     quad_shader.set4f("global_color"_s, f, f, f, 1.0f);
@@ -154,9 +162,10 @@ void draw() {
     // draw texture
     glBindVertexArray(texture_vertex_array_object);
     texture_shader.use();
+    // glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture_map);
 
-    glDrawElements(GL_TRIANGLES, ARRAY_LENGTH(texture_indices), GL_UNSIGNED_INT,
-                   0);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     // end
     glfwSwapBuffers(window);
@@ -234,15 +243,13 @@ int main(void) {
         // bind my quad_indices
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad_element_buffer_objects);
 
-        // layout (location = 0) in vec3 aPos;
-        glVertexAttribPointer(0, 3, GL_FLOAT, false,
-                              ARRAY_LENGTH(quad_indices) * sizeof(float),
+        // layout (location = 0) in vec3 pos;
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, 6 * sizeof(float),
                               (void *)0);
         glEnableVertexAttribArray(0);
 
         // layout (location = 1) in vec4 color;
-        glVertexAttribPointer(1, 3, GL_FLOAT, false,
-                              ARRAY_LENGTH(quad_indices) * sizeof(float),
+        glVertexAttribPointer(1, 3, GL_FLOAT, false, 6 * sizeof(float),
                               (void *)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
     }
@@ -251,8 +258,8 @@ int main(void) {
     glBindVertexArray(0);
 
     { // texture
-        glGenBuffers(1, &texture_vertex_buffer_object);
         glGenVertexArrays(1, &texture_vertex_array_object);
+        glGenBuffers(1, &texture_vertex_buffer_object);
         glGenBuffers(1, &texture_element_buffer_objects);
 
         glBindVertexArray(texture_vertex_array_object);
@@ -266,11 +273,43 @@ int main(void) {
                      texture_indices, GL_STATIC_DRAW);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, texture_element_buffer_objects);
 
-        // layout (location = 0) in vec3 aPos;
-        glVertexAttribPointer(0, 3, GL_FLOAT, false,
-                              ARRAY_LENGTH(texture_indices) * sizeof(float),
+        // layout (location = 0) in vec3 pos;
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, 8 * sizeof(float),
                               (void *)0);
         glEnableVertexAttribArray(0);
+
+        // layout (location = 1) in vec4 color;
+        glVertexAttribPointer(1, 3, GL_FLOAT, false, 8 * sizeof(float),
+                              (void *)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+
+        // layout (location = 2) in vec4 texture_cord;
+        glVertexAttribPointer(2, 2, GL_FLOAT, false, 8 * sizeof(float),
+                              (void *)(6 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+
+        // load texture
+        glGenTextures(1, &texture_map);
+        glBindTexture(GL_TEXTURE_2D, texture_map);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                        GL_LINEAR_MIPMAP_LINEAR);
+        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        {
+            int width, height, nrChannels;
+            u8 *data = stbi_load("./wall.jpg", &width, &height, &nrChannels, 0);
+            assert(nrChannels == 3);
+            assert(data);
+            // DEFER[data = data] { stbi_image_free(data); };
+
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
+                         GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
     }
 
     // unbind
