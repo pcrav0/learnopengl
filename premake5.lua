@@ -30,7 +30,7 @@ workspace('game') do
          '-ldl',
       }
 
-      files{ 'utils.hpp', 'main.cpp', }
+      files{ 'utils.hpp', 'main.cpp', 'texture-main.cpp' }
 
       filter('files:vertex_shaders.glsl') do
          buildinputs{ 'vertex_shaders.glsl' }
@@ -58,6 +58,7 @@ workspace('game') do
    project('glad') do
       local loc = './thirdparty/glad/'
       location(loc)
+
       kind('StaticLib')
       language('C')
       targetdir('obj/%{cfg.buildcfg}')
