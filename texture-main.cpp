@@ -56,7 +56,8 @@ uint quad_indices[] = {
 };
 
 // texture
-uint texture_map;
+uint texture_map_wall;
+uint texture_map_happyface;
 
 // procs
 void update() {
@@ -81,15 +82,22 @@ void draw() {
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     float f = min(abs(sin(current_time)) + 0.1f, 1.0f);
-    quad_shader.set4f("global_color"_s, f, f, f, 1.0f);
+    quad_shader.set_float_4("global_color"_s, f, f, f, 1.0f);
 
     // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     // draw texture
     glBindVertexArray(texture_vertex_array_object);
     texture_shader.use();
+
+    texture_shader.set_int("texture_map_wall"_s, 0);
+    texture_shader.set_int("texture_map_happyface"_s, 1);
+
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture_map);
+    glBindTexture(GL_TEXTURE_2D, texture_map_wall);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, texture_map_happyface);
 
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -187,9 +195,9 @@ int texture_main(void) {
                               (void *)(6 * sizeof(float)));
         glEnableVertexAttribArray(2);
 
-        // load texture
-        glGenTextures(1, &texture_map);
-        glBindTexture(GL_TEXTURE_2D, texture_map);
+        // load texture wall
+        glGenTextures(1, &texture_map_wall);
+        glBindTexture(GL_TEXTURE_2D, texture_map_wall);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -200,12 +208,37 @@ int texture_main(void) {
 
         {
             int width, height, nrChannels;
-            u8 *data = stbi_load("./wall.jpg", &width, &height, &nrChannels, 0);
+            u8 *data =
+                stbi_load("./container.jpg", &width, &height, &nrChannels, 0);
             assert(nrChannels == 3);
             assert(data);
-            // DEFER[data = data] { stbi_image_free(data); };
+            DEFER[data = data] { stbi_image_free(data); };
 
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
+                         GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+
+        glGenTextures(1, &texture_map_happyface);
+        glBindTexture(GL_TEXTURE_2D, texture_map_happyface);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                        GL_LINEAR_MIPMAP_LINEAR);
+        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        {
+            int width, height, nrChannels;
+            stbi_set_flip_vertically_on_load(true);
+            u8 *data =
+                stbi_load("./awesomeface.png", &width, &height, &nrChannels, 0);
+            assert(nrChannels == 4);
+            assert(data);
+            DEFER[data = data] { stbi_image_free(data); };
+
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA,
                          GL_UNSIGNED_BYTE, data);
             glGenerateMipmap(GL_TEXTURE_2D);
         }

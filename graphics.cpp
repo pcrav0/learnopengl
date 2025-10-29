@@ -64,7 +64,10 @@ GLint Shader::bind(const String &name) const {
     return result;
 }
 
-void Shader::set4f(const String &name, float x, float y, float z, float w) {
+void Shader::set_int(const String &name, int n) { glUniform1i(bind(name), n); }
+
+void Shader::set_float_4(const String &name, float x, float y, float z,
+                         float w) {
     glUniform4f(bind(name), x, y, z, w);
 }
 

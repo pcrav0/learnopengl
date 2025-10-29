@@ -26,7 +26,9 @@ struct Shader {
 
     GLint bind(const utils::String &name) const;
 
-    void set4f(const utils::String &name, float x, float y, float z, float w);
+    void set_int(const utils::String &name, int n);
+    void set_float_4(const utils::String &name, float x, float y, float z,
+                     float w);
 };
 
 GLFWwindow *init();
