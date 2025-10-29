@@ -23,6 +23,10 @@ uint texture_vertex_buffer_object;  // vbo
 uint texture_vertex_array_object;   // vao
 uint texture_element_buffer_object; // ebo
 
+// texture
+uint texture_map_wall;
+uint texture_map_happyface;
+
 // shaders
 Shader quad_shader;
 Shader texture_shader;
@@ -54,10 +58,6 @@ uint quad_indices[] = {
     0, 1, 3, // first triangle
     1, 2, 3, // second triangle
 };
-
-// texture
-uint texture_map_wall;
-uint texture_map_happyface;
 
 // procs
 void update() {
@@ -128,7 +128,7 @@ int texture_main(void) {
     texture_shader = Shader("./vertex-shader-texture.glsl"_s,
                             "./fragment-shader-texture.glsl"_s, sb);
 
-    { // quad
+    USE[] { // quad
         // create my buffers
         glGenBuffers(1, &quad_vertex_buffer_object);
         glGenVertexArrays(1, &quad_vertex_array_object);
@@ -159,10 +159,10 @@ int texture_main(void) {
         glVertexAttribPointer(1, 3, GL_FLOAT, false, 6 * sizeof(float),
                               (void *)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
-    }
 
-    // unbind
-    glBindVertexArray(0);
+        // unbind
+        glBindVertexArray(0);
+    };
 
     { // texture
         glGenVertexArrays(1, &texture_vertex_array_object);
@@ -206,7 +206,7 @@ int texture_main(void) {
         // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        {
+        USE[] {
             int width, height, nrChannels;
             u8 *data =
                 stbi_load("./container.jpg", &width, &height, &nrChannels, 0);
@@ -217,7 +217,7 @@ int texture_main(void) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
                          GL_UNSIGNED_BYTE, data);
             glGenerateMipmap(GL_TEXTURE_2D);
-        }
+        };
 
         glGenTextures(1, &texture_map_happyface);
         glBindTexture(GL_TEXTURE_2D, texture_map_happyface);
@@ -229,7 +229,7 @@ int texture_main(void) {
         // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        {
+        USE[] {
             int width, height, nrChannels;
             stbi_set_flip_vertically_on_load(true);
             u8 *data =
@@ -241,11 +241,11 @@ int texture_main(void) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA,
                          GL_UNSIGNED_BYTE, data);
             glGenerateMipmap(GL_TEXTURE_2D);
-        }
-    }
+        };
 
-    // unbind
-    glBindVertexArray(0);
+        // unbind
+        glBindVertexArray(0);
+    }
 
     while (!glfwWindowShouldClose(window)) {
         update();

@@ -111,6 +111,13 @@ template <typename F> struct _Defer {
 #define UTILS_DEFER                                                            \
     utils::_Defer UTILS_CONCAT(UTILS_CONCAT(__defer__, __COUNTER__), __LINE__) =
 
+template <typename F> struct _Use {
+    _Use(F f) { f(); }
+};
+
+#define UTILS_USE                                                              \
+    utils::_Use UTILS_CONCAT(UTILS_CONCAT(__use__, __COUNTER__), __LINE__) =
+
 #ifdef UTILS_MACRO_RENAME
 #define VA_ARGS_HEAD UTILS_VA_ARGS_HEAD
 #define VA_ARGS_TAIL UTILS_VA_ARGS_TAIL
@@ -118,6 +125,7 @@ template <typename F> struct _Defer {
 #define STRINGFY UTILS_STRINGFY
 #define ARRAY_LENGTH UTILS_ARRAY_LENGTH
 #define DEFER UTILS_DEFER
+#define USE UTILS_USE
 #endif
 
 UTILS_PROC ssize ptr_diff(void *a, void *b);
