@@ -14,15 +14,15 @@
 #define UTILS_IGNORE(...)
 
 #ifndef UTILS_PROC
-#define UTILS_PROC constexpr inline
+#define UTILS_PROC
 #endif
 
 #ifndef UTILS_PROC_INIT
-#define UTILS_PROC_INIT UTILS_PROC __attribute__((constructor))
+#define UTILS_PROC_INIT constexpr __attribute__((constructor))
 #endif
 
 #ifndef UTILS_PROC_FINI
-#define UTILS_PROC_FINI UTILS_PROC __attribute__((destructor))
+#define UTILS_PROC_FINI constexpr __attribute__((destructor))
 #endif
 
 #ifndef UTILS_PROC_CONSTRUCT
@@ -264,7 +264,7 @@ struct Allocator {
 };
 
 #ifndef UTILS_NO_GLOBAL_ALLOCATOR
-static Allocator *global_allocator = nullptr;
+extern Allocator *global_allocator;
 #endif
 
 template <typename T> struct Slice {
@@ -1102,10 +1102,6 @@ struct String : public Slice<char> {
     };
 };
 
-UTILS_PROC String operator""_s(const char *chars, usize length) {
-    return String(const_cast<char *>(chars), length);
-}
-
 template <Allocator *allocator = nullptr> struct String_Builder {
     Array<char, allocator> chars;
     Array<usize, allocator> control;
@@ -1421,7 +1417,20 @@ template <typename T, Allocator *allocator = nullptr> struct Shared {
     UTILS_PROC_DESTRUCT ~Shared() { control->destroy(); }
 };
 
-String file_read(String file_path, String_Builder<> &sb) {
+UTILS_PROC String operator""_s(const char *chars, usize length);
+
+UTILS_PROC String string_from_zstr(char *zstr);
+UTILS_PROC String file_read(String file_path, String_Builder<> &sb);
+} // namespace utils
+
+#ifdef UTILS_IMPLEMENT
+
+UTILS_PROC utils::ssize utils::ptr_diff(void *a, void *b) {
+    return reinterpret_cast<ssize>(a) - reinterpret_cast<ssize>(b);
+}
+
+UTILS_PROC utils::String utils::file_read(utils::String file_path,
+                                          utils::String_Builder<> &sb) {
     assert(file_path.length <= PATH_MAX);
     static char path[PATH_MAX + 1] = {0};
     memcpy(path, file_path.items, file_path.length);
@@ -1451,20 +1460,25 @@ String file_read(String file_path, String_Builder<> &sb) {
     return sb.end();
 }
 
+UTILS_PROC utils::String utils::operator""_s(const char *chars, usize length) {
+    return String(const_cast<char *>(chars), length);
+}
+
+UTILS_PROC utils::String utils::string_from_zstr(char *zstr) {
+    return String(zstr, strlen(zstr));
+}
+
+#ifndef UTILS_NO_GLOBAL_ALLOCATOR
+utils::Allocator *utils::global_allocator = nullptr;
+
 UTILS_PROC_INIT void _global_allocator_destroy_init() {
-    static auto _allocator = Allocator_Malloc();
-    global_allocator = &_allocator;
+    static auto _allocator = utils::Allocator_Malloc();
+    utils::global_allocator = &_allocator;
 }
 
 UTILS_PROC_FINI void _global_allocator_destroy_fini() {
-    global_allocator->destroy();
+    utils::global_allocator->destroy();
 }
-} // namespace utils
-
-#ifdef UTILS_IMPLEMENT
-
-UTILS_PROC utils::ssize utils::ptr_diff(void *a, void *b) {
-    return reinterpret_cast<ssize>(a) - reinterpret_cast<ssize>(b);
-}
+#endif
 
 #endif

@@ -4,7 +4,7 @@ end
 
 workspace('game') do
    configurations{ 'debug', 'release' }
-   includedirs { './thirdparty/', './thirdparty/glad/include' }
+   includedirs { './thirdparty/stb_image/', './thirdparty/glad/include' }
 
    project('main') do
       kind('ConsoleApp')
@@ -30,7 +30,11 @@ workspace('game') do
          '-ldl',
       }
 
-      files{ 'utils.hpp', 'main.cpp', 'texture-main.cpp' }
+      files{
+         'utils.hpp', 'utils.cpp',
+         'graphics.hpp', 'graphics.cpp',
+         'main.cpp', 'texture-main.cpp',
+      }
 
       filter('files:vertex_shaders.glsl') do
          buildinputs{ 'vertex_shaders.glsl' }
@@ -78,7 +82,7 @@ workspace('game') do
    end
 
    project('stb_image') do
-      local loc = './thirdparty/'
+      local loc = './thirdparty/stb_image/'
       location(loc)
 
       kind('StaticLib')
@@ -86,7 +90,7 @@ workspace('game') do
       targetdir('obj/%{cfg.buildcfg}')
       toolset('gcc')
 
-      files{ 'stb_image.c' }
+      files{ loc..'/stb_image.c' }
 
       filter('configurations:debug') do
          defines{ 'DEBUG=true' }

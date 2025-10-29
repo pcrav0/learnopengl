@@ -21,20 +21,20 @@ premake5 gmake
 
 ## debug mode
 ``` sh
-make verbose=true config=debug -j$(nproc)
-./bin/debug/game
+make -f game.make verbose=true config=debug -j$(nproc)
+./bin/debug/main texture
 ```
 
 ## release mode
 ``` sh
-make verbose=true config=release -j$(nproc)
-./bin/release/game
+make -f game.make verbose=true config=release -j$(nproc)
+./bin/release/main texture
 ```
 
 ## tests
 ``` sh
-make verbose=true config=release -j$(nproc)
-./bin/test/game
+make -f test.make verbose=true config=test -j$(nproc)
+./bin/test/test
 ```
 
 # credits
