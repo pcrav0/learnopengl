@@ -102,6 +102,15 @@ typedef double f64;
 
 #define UTILS_ARRAY_LENGTH(X) (sizeof((X)) / sizeof((X)[0]))
 
+constexpr u64 log2(u64 n) {
+    u64 result = 0;
+    while (n > 1) {
+        n >>= 1;
+        result++;
+    }
+    return result;
+}
+
 template <typename F> struct _Defer {
     F f;
     _Defer(F f) : f(f) {}
@@ -715,7 +724,7 @@ template <typename T, Allocator *allocator = nullptr> struct List {
     // TODO: List chain() {...} // create a cycle
 };
 
-template <typename T, Allocator *allocator = nullptr> struct Double_List {
+template <typename T, Allocator *allocator = nullptr> struct Tree {
     struct Node {
         T head = {};
         Node *next = nullptr;
@@ -766,11 +775,11 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
 
     Node *node;
 
-    UTILS_PROC_CONSTRUCT Double_List() : node{nullptr} {}
+    UTILS_PROC_CONSTRUCT Tree() : node{nullptr} {}
 
-    UTILS_PROC_CONSTRUCT Double_List(Node *node) : node{node} {}
+    UTILS_PROC_CONSTRUCT Tree(Node *node) : node{node} {}
 
-    UTILS_PROC Double_List loop_next(auto f) const {
+    UTILS_PROC Tree loop_next(auto f) const {
         Node *current = node;
         while (current != nullptr) {
             if (!f(current))
@@ -781,7 +790,7 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         return *this;
     }
 
-    UTILS_PROC Double_List loop_prev(auto f) const {
+    UTILS_PROC Tree loop_prev(auto f) const {
         Node *current = node;
         while (current != nullptr) {
             if (!f(current))
@@ -887,7 +896,7 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         UTILS_UNREACHEBLE();
     }
 
-    UTILS_PROC Double_List append_next(T item) {
+    UTILS_PROC Tree append_next(T item) {
         if (node == nullptr)
             prepend_next(item);
 
@@ -903,7 +912,7 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         return *this;
     }
 
-    UTILS_PROC Double_List append_prev(T item) {
+    UTILS_PROC Tree append_prev(T item) {
         if (node == nullptr)
             prepend_prev(item);
 
@@ -919,7 +928,7 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         return *this;
     }
 
-    UTILS_PROC Double_List prepend_next(T item) {
+    UTILS_PROC Tree prepend_next(T item) {
         Node *it = alloc<Node>(1, allocator);
 
         it->head = item;
@@ -934,7 +943,7 @@ template <typename T, Allocator *allocator = nullptr> struct Double_List {
         return *this;
     }
 
-    UTILS_PROC Double_List prepend_prev(T item) {
+    UTILS_PROC Tree prepend_prev(T item) {
         Node *it = alloc<Node>(1, allocator);
 
         it->head = item;
@@ -987,8 +996,10 @@ template <typename Key, typename Value,
                      static_cast<const Pair<Key, Value> *>(b)->key;
           },
           Allocator *allocator = nullptr>
-struct Table : public Array<Pair<Key, Value>, allocator> {
+struct Table : private Array<Pair<Key, Value>, allocator> {
     using Item = Pair<Key, Value>;
+    using Base = Array<Item, allocator>;
+
     struct iterator {
         Item *current;
 
@@ -1034,6 +1045,11 @@ struct Table : public Array<Pair<Key, Value>, allocator> {
 
     UTILS_PROC iterator begin() { return iterator(&this->at(0)); }
     UTILS_PROC iterator end() { return iterator(&this->at_raw(this->length)); }
+
+    UTILS_PROC Table reserve(usize increment) {
+        Base::reserve(increment);
+        return *this;
+    }
 
     UTILS_PROC Maybe<Item *> search(const Key &key) const {
         for (usize i = 0; i < this->length; i++) {
@@ -1101,11 +1117,20 @@ struct String : public Slice<char> {
     UTILS_PROC_CONSTRUCT String(char *chars, usize length)
         : Slice(chars, length) {}
 
+    UTILS_PROC bool is_zstr() const {
+        return this->at(this->length + 1) == '\0';
+    }
+
     UTILS_PROC char *zstr() const {
         static char result[1024] = {0};
+
+        if (is_zstr())
+            return this->items;
+
         UTILS_ASSERT(this->length <= sizeof(result));
         memset(result, 0, sizeof(result));
         memcpy(result, this->items, this->length);
+
         return result;
     };
 };
@@ -1141,11 +1166,58 @@ template <usize N> struct Allocator_Static : public Allocator {
     Slice<u8> pool;
     usize used;
 
+    UTILS_PROC_CONSTRUCT Allocator_Static(Slice<u8> pool)
+        : pool(pool), used(0) {
+        UTILS_ASSERT(pool.length == N);
+    }
+
     UTILS_PROC_CONSTRUCT Allocator_Static()
-        : pool{Slice<u8>(reinterpret_cast<u8 *>(std::malloc(N)), N)}, used{0} {}
+        : pool(Slice<u8>(reinterpret_cast<u8 *>(std::malloc(N)), N)), used(0) {}
 
     UTILS_PROC void *run(void *ptr, usize old_size, usize new_size) override {
         UTILS_ASSERT((used + new_size) <= N);
+
+        // dealloc
+        if (new_size == 0) {
+            return nullptr;
+        }
+
+        // alloc
+        void *result = &pool[used];
+        used += new_size;
+
+        // realloc
+        if (ptr != nullptr && old_size != 0)
+            std::memcpy(result, ptr, old_size);
+
+        return result;
+    }
+
+    UTILS_PROC void destroy() override {
+        if (pool.items == nullptr)
+            return;
+
+        std::free(pool.items);
+    }
+
+    UTILS_PROC void reset() override { used = 0; }
+};
+
+template <usize N> struct Allocator_Ring : public Allocator {
+    Slice<u8> pool;
+    usize used;
+
+    UTILS_PROC_CONSTRUCT Allocator_Ring(Slice<u8> pool) : pool(pool), used(0) {
+        UTILS_ASSERT(pool.length == N);
+    }
+
+    UTILS_PROC_CONSTRUCT Allocator_Ring()
+        : pool{Slice<u8>(reinterpret_cast<u8 *>(std::malloc(N)), N)}, used{0} {}
+
+    UTILS_PROC void *run(void *ptr, usize old_size, usize new_size) override {
+        if ((used + new_size) > N) {
+            used = 0;
+        }
 
         // dealloc
         if (new_size == 0) {

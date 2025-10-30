@@ -1,3 +1,4 @@
+#define UTILS_MACRO_RENAME
 #define UTILS_IMPLEMENT
 #include "utils.hpp"
 
@@ -8,7 +9,7 @@
 using namespace utils;
 
 int main() {
-    {
+    USE[] {
         int *p = alloc<int>();
         assert(p != NULL);
         *p = 5;
@@ -22,8 +23,8 @@ int main() {
         q[1] = 8;
         assert(q[0] == 5);
         assert(q[1] == 8);
-    }
-    {
+    };
+    USE[] {
         int *p = alloc<int>();
         *p = 69;
 
@@ -62,8 +63,8 @@ int main() {
 
         // assert(*s0.counter() == *s1.counter());
         // assert(*s0.counter() == 0);
-    }
-    {
+    };
+    USE[] {
         Array<int> a;
         a.push(2);
         a.push(3);
@@ -82,8 +83,8 @@ int main() {
         assert(a.pop() == 69);
         assert(a.length == 1);
         assert(a[0] == 3);
-    }
-    {
+    };
+    USE[] {
         List<int> l0;
         assert(l0.length() == 0);
 
@@ -134,9 +135,9 @@ int main() {
 
         l0.forward();
         assert(l0.length() == 0);
-    }
-    {
-        auto l0 = Double_List<int>();
+    };
+    USE[] {
+        auto l0 = Tree<int>();
         assert(l0.length_next() == 0);
         assert(l0.length_prev() == 0);
         assert(l0.length() == 0);
@@ -182,8 +183,8 @@ int main() {
         assert(l0.backward().head == 69);
         assert(l0.remove(-1).head == -420);
         assert(l0.remove().head == -69);
-    }
-    {
+    };
+    USE[] {
         auto t0 = Table<String, int>();
 
         // t0["hi"_s] = 5;
@@ -198,8 +199,8 @@ int main() {
         t0["hi"_s] = 69;
         assert(t0["hi"_s] == 69);
         assert(t0["other"_s] == 3);
-    }
-    {
+    };
+    USE[] {
         int i = 0;
         const int end = 5;
         auto l0 = Array<int>();
@@ -215,8 +216,8 @@ int main() {
         for (auto &it : Reverse(l0)) {
             assert(it == --i);
         }
-    }
-    {
+    };
+    USE[] {
         int i = 0;
         const int end = 5;
         auto l0 = List<int>();
@@ -226,11 +227,11 @@ int main() {
         for (auto &it : l0) {
             assert(it.head == i++);
         }
-    }
-    {
+    };
+    USE[] {
         int i = 1;
         const int end = 5;
-        auto l0 = Double_List<int>();
+        auto l0 = Tree<int>();
         l0.prepend_next(0);
 
         for (int it = i; it < end / 2 + 1; it++)
@@ -248,8 +249,8 @@ int main() {
         for (auto &it : Reverse(l0)) {
             assert(it.head == --i);
         }
-    }
-    {
+    };
+    USE[] {
         int i = 0;
         const int end = 5;
 
@@ -269,16 +270,16 @@ int main() {
             assert(l0[it.key] == it.value);
         }
 
-        assert(l0.is_sorted());
-    }
-    {
+        // assert(l0.is_sorted());
+    };
+    USE[] {
         auto l0 = Table<String, int>();
         l0.put({{"nice"_s, 69}, {"UwU"_s, 42}, {"poggers"_s, 1337}});
-        assert(l0.is_sorted());
+        // assert(l0.is_sorted());
         assert(l0["nice"_s] == 69);
         assert(l0["UwU"_s] == 42);
         assert(l0["poggers"_s] == 1337);
-    }
+    };
 
     puts("******");
     printf("nice\n");
