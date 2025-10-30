@@ -33,7 +33,7 @@ workspace('game') do
       files{
          'utils.hpp', 'utils.cpp',
          'graphics.hpp', 'graphics.cpp',
-         'main.cpp', 'texture-main.cpp',
+         'main.cpp', 'texture-main.cpp', 'transformation-main.cpp',
       }
 
       filter('files:vertex_shaders.glsl') do

@@ -1,4 +1,5 @@
 int texture_main();
+int transformation_main();
 
 #include <assert.h>
 #include <stdio.h>
@@ -14,6 +15,8 @@ int main(int argc, char **argv) {
 
     if (arg == "texture"_s) {
         return texture_main();
+    } else if (arg == "transformation"_s) {
+        return transformation_main();
     } else {
         printf("%s dont exists\n", arg.zstr());
         return -1;

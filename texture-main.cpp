@@ -11,29 +11,29 @@ using namespace utils;
 #include "graphics.hpp"
 
 // os
-GLFWwindow *window;
-float current_time;
+static GLFWwindow *window;
+static float current_time;
 
 // gl buffers
-uint quad_vertex_buffer_object;  // vbo
-uint quad_vertex_array_object;   // vao
-uint quad_element_buffer_object; // ebo
+static uint quad_vertex_buffer_object;  // vbo
+static uint quad_vertex_array_object;   // vao
+static uint quad_element_buffer_object; // ebo
 
-uint texture_vertex_buffer_object;  // vbo
-uint texture_vertex_array_object;   // vao
-uint texture_element_buffer_object; // ebo
+static uint texture_vertex_buffer_object;  // vbo
+static uint texture_vertex_array_object;   // vao
+static uint texture_element_buffer_object; // ebo
 
 // texture
-uint texture_map_wall;
-uint texture_map_happyface;
+static uint texture_map_wall;
+static uint texture_map_happyface;
 
 // shaders
-Shader quad_shader;
-Shader texture_shader;
+static Shader quad_shader;
+static Shader texture_shader;
 
 // index
 
-float texture_vertices[] = {
+static float texture_vertices[] = {
     // pos ----------- | color ------------ | texture coord
     +0.5f, +0.5f, +0.0f, +0.5f, +0.5f, +0.5f, +1.0f, +1.0f, // top right
     +0.5f, -0.5f, +0.0f, +0.0f, +1.0f, +1.0f, +1.0f, +0.0f, // bottom right
@@ -41,12 +41,12 @@ float texture_vertices[] = {
     -0.5f, +0.5f, +0.0f, +1.0f, +0.3f, +1.0f, +0.0f, +1.0f, // top left
 };
 
-uint texture_indices[] = {
+static uint texture_indices[] = {
     0, 1, 3, // first triangle
     1, 2, 3, // second triangle
 };
 
-float quad_vertices[] = {
+static float quad_vertices[] = {
     // pos ---------- | color --------- |
     1.0f,  1.0f,  0.0f, 1.0f, 0.0f, 0.0f, // top right
     1.0f,  -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right
@@ -54,13 +54,13 @@ float quad_vertices[] = {
     -1.0f, 1.0f,  0.0f, 1.0f, 1.0f, 0.0f, // top left
 };
 
-uint quad_indices[] = {
+static uint quad_indices[] = {
     0, 1, 3, // first triangle
     1, 2, 3, // second triangle
 };
 
 // procs
-void update() {
+static void update() {
     if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
@@ -69,7 +69,7 @@ void update() {
     glfwPollEvents();
 }
 
-void draw() {
+static void draw() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -116,7 +116,7 @@ int texture_main(void) {
 
     String_Builder<> sb;
 
-    window = init();
+    window = init("texture");
     DEFER[] { glfwTerminate(); };
 
     glViewport(0, 0, 640, 480);

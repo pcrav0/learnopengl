@@ -31,4 +31,4 @@ struct Shader {
                      float w);
 };
 
-GLFWwindow *init();
+GLFWwindow *init(const char *title);

@@ -45,12 +45,9 @@
 #define UTILS_PROC_DESTRUCT UTILS_PROC
 #endif
 
-#ifndef UTILS_ASSERT
+#ifndef UTILS_ASSER
 #include <assert.h>
-#define UTILS_ASSERT(...)                                                      \
-    do {                                                                       \
-        assert(__VA_ARGS__);                                                   \
-    } while (0)
+#define UTILS_ASSERT(X) assert((X))
 #endif
 
 #ifndef UTILS_BREAKPOINT
@@ -278,6 +275,10 @@ struct Allocator {
     UTILS_PROC virtual void *run(void *ptr, usize old_size, usize new_size) = 0;
     UTILS_PROC virtual void destroy() = 0;
     UTILS_PROC virtual void reset() = 0;
+
+    UTILS_PROC operator Allocator *() {
+        return dynamic_cast<Allocator *>(this);
+    }
 };
 
 #ifndef UTILS_NO_GLOBAL_ALLOCATOR
@@ -492,7 +493,9 @@ template <typename T, Allocator *allocator = nullptr>
 struct Array : public Slice<T> {
     usize capacity;
 
-    static constexpr usize init_capacity = 256;
+    static constexpr usize init_capacity = (256 / sizeof(T)) > 0
+                                               ? (256 / sizeof(T))
+                                               : 1;
 
     UTILS_PROC_CONSTRUCT Array() : Slice<T>(), capacity{0} {}
 
@@ -507,31 +510,22 @@ struct Array : public Slice<T> {
     }
 
     UTILS_PROC Array reserve(usize increment) {
-        if (increment == 0)
-            return *this;
-
-        if (this->items == NULL) {
-            capacity = increment;
-            this->items = alloc<T>(capacity, allocator);
-            return *this;
-        }
-
         if (this->length + increment <= capacity)
             return *this;
 
         usize old_size = capacity;
-        while (this->length + increment > capacity) {
+        if (capacity == 0)
+            capacity = init_capacity;
+        while (this->length + increment > capacity)
             capacity *= 2;
-        }
-        usize new_size = capacity;
-        this->items = realloc<T>(this->items, old_size, new_size, allocator);
+
+        this->items = realloc<T>(this->items, old_size, capacity, allocator);
         return *this;
     }
 
     UTILS_PROC T &insert_reserve(usize index) {
         UTILS_ASSERT(index <= this->length);
-        reserve(capacity == 0 ? init_capacity
-                              : max(this->length, capacity * 2));
+        reserve(index + 1);
 
         this->length++;
         memset(&this->at(-1), 0, sizeof(T));
@@ -1073,7 +1067,7 @@ struct Table : private Array<Pair<Key, Value>, allocator> {
     }
 
     UTILS_PROC Table put(std::initializer_list<Item> items) {
-        this->reserve(items.size());
+        reserve(this->length + items.size());
 
         for (const auto &item : items) {
             if (auto it = search(item.key); it) {
@@ -1101,8 +1095,6 @@ struct Table : private Array<Pair<Key, Value>, allocator> {
             return (*it)->value;
         }
 
-        this->reserve(1);
-
         Item *it = &this->sorted_reserve(Item(key, {}));
         it->key = key;
         it->value = {};
@@ -1124,8 +1116,8 @@ struct String : public Slice<char> {
     UTILS_PROC char *zstr() const {
         static char result[1024] = {0};
 
-        if (is_zstr())
-            return this->items;
+        // if (is_zstr())
+        //     return this->items;
 
         UTILS_ASSERT(this->length <= sizeof(result));
         memset(result, 0, sizeof(result));
@@ -1140,25 +1132,38 @@ template <Allocator *allocator = nullptr> struct String_Builder {
     Array<usize, allocator> control;
 
     UTILS_PROC String_Builder write(char c) {
-        chars->push(c);
+        chars.push(c);
         return *this;
     }
 
     UTILS_PROC String_Builder write(const String &string) {
-        chars->reserve(string.length);
-        memcpy(chars->at(-1), string.items, sizeof(char) * string.length);
+        chars.reserve(chars.length + string.length);
+        for (usize i = 0; i < string.length; i++)
+            write(string[i]);
         return *this;
     }
 
-    UTILS_PROC usize start() {
-        usize result = chars.length;
-        control.push(result);
-        return result;
+    UTILS_PROC char *start() {
+        usize index = chars.length;
+        control.push(index);
+        return &chars.items[index];
     }
 
     UTILS_PROC String end() {
         usize offset = control.pop();
         return String(chars.splice(offset, -1));
+    }
+
+    UTILS_PROC String_Builder reset() {
+        dealloc<char>(chars.items, chars.length, allocator);
+        chars.items = nullptr;
+        chars.length = 0;
+
+        dealloc<usize>(control.items, control.length, allocator);
+        control.items = nullptr;
+        control.length = 0;
+
+        return *this;
     }
 };
 
@@ -1531,10 +1536,9 @@ UTILS_PROC utils::String utils::file_read(utils::String file_path,
     if (read_size <= 0)
         return String();
 
-    sb.start();
-    sb.chars.reserve(read_size);
-    assert(fread(sb.chars.items + sb.chars.length, 1, read_size, file) ==
-           read_size);
+    sb.chars.reserve(sb.chars.length + read_size);
+    char *s = sb.start();
+    assert(fread(s, 1, read_size, file) == read_size);
     sb.chars.length += read_size;
 
     return sb.end();

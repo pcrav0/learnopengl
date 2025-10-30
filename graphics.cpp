@@ -71,7 +71,7 @@ void Shader::set_float_4(const String &name, float x, float y, float z,
     glUniform4f(bind(name), x, y, z, w);
 }
 
-GLFWwindow *init() {
+GLFWwindow *init(const char *title) {
     if (!glfwInit())
         exit(-1);
 
@@ -90,7 +90,7 @@ GLFWwindow *init() {
     glfwWindowHintString(GLFW_X11_INSTANCE_NAME, "#DEBUG");
 #endif
 
-    GLFWwindow *result = glfwCreateWindow(640, 480, "texture", NULL, NULL);
+    GLFWwindow *result = glfwCreateWindow(640, 480, title, NULL, NULL);
 
     if (!result)
         exit(-1);
