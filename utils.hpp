@@ -214,18 +214,8 @@ template <typename T> struct Reverse {
 };
 
 template <typename T, typename U> struct Pair {
-    union {
-        // T first;
-        T key;
-        // T a;
-        // T x;
-    };
-    union {
-        // U second;
-        U value;
-        // U b;
-        // U y;
-    };
+    T key;
+    U value;
 
     UTILS_PROC_CONSTRUCT_IMPLICITY Pair(T key, U value)
         : key(key), value(value) {}
@@ -1013,22 +1003,22 @@ struct Table : private Array<Pair<Key, Value>, allocator> {
             return *this;
         }
 
-        UTILS_PROC iterator &operator++(Value) {
-            iterator result = *this;
-            ++(*this);
-            return result;
-        }
+        // UTILS_PROC iterator &operator++(Value) {
+        //     iterator result = *this;
+        //     ++(*this);
+        //     return result;
+        // }
 
         UTILS_PROC iterator &operator--() {
             --current;
             return *this;
         }
 
-        UTILS_PROC iterator &operator--(Value) {
-            iterator result = *this;
-            --(*this);
-            return result;
-        }
+        // UTILS_PROC iterator &operator--(Value) {
+        //     iterator result = *this;
+        //     --(*this);
+        //     return result;
+        // }
 
         UTILS_PROC Item &operator*() { return *current; }
         UTILS_PROC Item *operator->() { return current; }

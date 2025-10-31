@@ -6,6 +6,16 @@
 
 #include <GLFW/glfw3.h>
 
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/scalar_constants.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+
 extern GLint max_vertex_attributes;
 
 struct Shader {
@@ -19,16 +29,20 @@ struct Shader {
                     const utils::String &fragment_shader_file_path,
                     utils::String_Builder<> &sb);
 
-    static void compile(utils::uint shader, const utils ::String &file_path,
+    static void compile(utils::uint shader, const utils::String &file_path,
                         utils::String_Builder<> &sb);
 
-    void use() const;
+    void use();
 
-    GLint bind(const utils::String &name) const;
+    GLint bind(const utils::String &name);
 
     void set_int(const utils::String &name, int n);
     void set_float_4(const utils::String &name, float x, float y, float z,
                      float w);
+    void set_mat_4(const utils::String &name, const glm::mat4 &matrix,
+                   bool transpose = false);
 };
 
 GLFWwindow *init(const char *title);
+
+glm::mat4 camera(float Translate, glm::vec2 const &Rotate);

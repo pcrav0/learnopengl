@@ -135,6 +135,12 @@ static void draw() {
         glBindTexture(GL_TEXTURE_2D, textures[i]);
     }
 
+    glm::mat4 m(1.0f);
+    // m = glm::scale(m, glm::vec3(0.5, 0.5, 0.5));
+    m = glm::rotate(m, current_time, glm::vec3(1.0f, 1.0f, 1.0f));
+    m = glm::translate(m, glm::vec3(0.5f, 0.0f, 0.5f));
+    shader.set_mat_4("transform"_s, m);
+
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     glfwSwapBuffers(window);

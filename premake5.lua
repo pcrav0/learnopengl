@@ -4,7 +4,11 @@ end
 
 workspace('game') do
    configurations{ 'debug', 'release' }
-   includedirs { './thirdparty/stb_image/', './thirdparty/glad/include' }
+   includedirs {
+      './thirdparty/stb_image/',
+      './thirdparty/glad/include',
+      './thirdparty/glm/',
+   }
 
    project('main') do
       kind('ConsoleApp')

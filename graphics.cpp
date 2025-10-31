@@ -53,9 +53,9 @@ void Shader::compile(uint shader, const String &file_path,
     }
 }
 
-void Shader::use() const { glUseProgram(id); }
+void Shader::use() { glUseProgram(id); }
 
-GLint Shader::bind(const String &name) const {
+GLint Shader::bind(const String &name) {
     GLint result = glGetUniformLocation(id, name.zstr());
 
     if (result < 0)
@@ -69,6 +69,11 @@ void Shader::set_int(const String &name, int n) { glUniform1i(bind(name), n); }
 void Shader::set_float_4(const String &name, float x, float y, float z,
                          float w) {
     glUniform4f(bind(name), x, y, z, w);
+}
+
+void Shader::set_mat_4(const utils::String &name, const glm::mat4 &matrix,
+                       bool transpose) {
+    glUniformMatrix4fv(bind(name), 1, transpose, glm::value_ptr(matrix));
 }
 
 GLFWwindow *init(const char *title) {
