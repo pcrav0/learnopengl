@@ -236,14 +236,14 @@ template <typename T> struct Maybe {
 };
 
 template <typename T> Maybe<T> UTILS_PROC some(T value) {
-    return (Maybe<T>){
+    return Maybe<T>{
         .value = value,
         .has = true,
     };
 }
 
 template <typename T> Maybe<T> UTILS_PROC none() {
-    return (Maybe<T>){
+    return Maybe<T>{
         .value = {},
         .has = false,
     };

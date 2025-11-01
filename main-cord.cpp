@@ -10,6 +10,9 @@
 
 using namespace utils;
 
+#define SCR_WIDTH 640
+#define SCR_HEIGHT 480
+
 static GLFWwindow *window;
 static float current_time;
 
@@ -29,34 +32,59 @@ struct Vertice {
 };
 
 static Vertice vertices[] = {
-    // top right
-    {
-        .pos = {+0.5f, +0.5f, +0.0f},
-        .texture_cord = {+1.0f, +1.0f},
-    },
+    {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
+    {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}},
+    {{0.5f, 0.5f, -0.5f}, {1.0f, 1.0f}},
+    {{0.5f, 0.5f, -0.5f}, {1.0f, 1.0f}},
+    {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f}},
+    {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}},
 
-    // bottom right
-    {
-        .pos = {+0.5f, -0.5f, +0.0f},
-        .texture_cord = {+1.0f, +0.0f},
-    },
+    {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},
+    {{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f}},
+    {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f}},
+    {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f}},
 
-    // bottom left
-    {
-        .pos = {-0.5f, -0.5f, +0.0f},
-        .texture_cord = {+0.0f, +0.0f},
-    },
+    {{-0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f}},
+    {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}},
+    {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}},
+    {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{-0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
 
-    // top left
-    {
-        .pos = {-0.5f, +0.5f, +0.0f},
-        .texture_cord = {+0.0f, +1.0f},
-    },
+    {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{0.5f, 0.5f, -0.5f}, {1.0f, 1.0f}},
+    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}},
+    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}},
+    {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
+
+    {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}},
+    {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f}},
+    {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}},
+
+    {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f}},
+    {{0.5f, 0.5f, -0.5f}, {1.0f, 1.0f}},
+    {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f}},
+    {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f}},
+    {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f}},
 };
 
-static uint indices[] = {
-    0, 1, 3, // first triangle
-    1, 2, 3, // second triangle
+glm::vec3 cubes_pos[] = {
+    {0.0f, 0.0f, 0.0f},     {2.0f, 5.0f, -15.0f}, {-1.5f, -2.2f, -2.5f},
+    {-3.8f, -2.0f, -12.3f}, {2.4f, -0.4f, -3.5f}, {-1.7f, 3.0f, -7.5f},
+    {1.3f, -2.0f, -2.5f},   {1.5f, 2.0f, -2.5f},  {1.5f, 0.2f, -1.5f},
+    {-1.3f, 1.0f, -1.5f},
+};
+
+static uint indices[][3] = {
+    // {0, 1, 3},
+    // {1, 2, 3},
 };
 
 static void load_texture(const char *file_path, bool flip = false) {
@@ -120,7 +148,7 @@ static void draw() {
 
     glClearColor((float)0x18 / 0xff, (float)0x18 / 0xff, (float)0x18 / 0xff,
                  1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glBindVertexArray(vertex_array_object);
     shader.use();
@@ -137,28 +165,38 @@ static void draw() {
         glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, textures[i]);
     }
+    glm::mat4 view =
+        glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
+    glm::mat4 projection =
+        glm::perspective(glm::radians(45.0f),
+                         (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-    glm::mat4 m(1.0f);
-    m = glm::scale(m, glm::vec3(0.5, 0.5, 0.5));
-    // m = glm::translate(m, glm::vec3(0.5f, 0.0f, 0.5f));
-    m = glm::rotate(m, current_time, glm::vec3(1.0f, 1.0f, 1.0f));
-    shader.set_mat_4("transform"_s, m);
+    shader.set_mat4("projection"_s, projection);
+    shader.set_mat4("view"_s, view);
 
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    for (uint i = 0; i < ARRAY_LENGTH(cubes_pos); i++) {
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, cubes_pos[i]);
+        float angle = 20.0f * (i + 1);
+        model = glm::rotate(model, current_time * glm::radians(angle),
+                            glm::vec3(1.0f, 0.3f, 0.5f));
+        shader.set_mat4("model"_s, model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+    }
 
     glfwSwapBuffers(window);
 }
 
-int transformation_main(void) {
+int cord_main(void) {
     String_Builder<> sb;
 
-    window = init("transformation");
+    window = init("cord");
     DEFER[] { glfwTerminate(); };
 
-    glViewport(0, 0, 640, 480);
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
-    shader = Shader("./vertex-shader-cube.glsl"_s,
-                    "./fragment-shader-cube.glsl"_s, sb);
+    shader = Shader("./assets/shaders/cord-vertex.glsl"_s,
+                    "./assets/shaders/cord-fragment.glsl"_s, sb);
 
     glGenBuffers(1, &vertex_buffer_object);
     glGenVertexArrays(1, &vertex_array_object);
@@ -185,8 +223,8 @@ int transformation_main(void) {
                           (void *)offsetof(Vertice, texture_cord));
     glEnableVertexAttribArray(1);
 
-    load_texture("./wall.jpg", true);
-    load_texture("./awesomeface.png", true);
+    load_texture("./assets/img/container.jpg", true);
+    load_texture("./assets/img/awesomeface.png", true);
     assert(textures.length == 2);
 
     glBindVertexArray(0);

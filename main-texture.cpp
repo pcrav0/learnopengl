@@ -82,7 +82,7 @@ static void draw() {
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     float f = min(abs(sin(current_time)) + 0.1f, 1.0f);
-    quad_shader.set_float_4("global_color"_s, f, f, f, 1.0f);
+    quad_shader.set_vec4("global_color"_s, {f, f, f, 1.0f});
 
     // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -122,11 +122,11 @@ int texture_main(void) {
     glViewport(0, 0, 640, 480);
 
     // create shaders program
-    quad_shader = Shader("./vertex-shader-quad.glsl"_s,
-                         "./fragment-shader-quad.glsl"_s, sb);
+    quad_shader = Shader("./assets/shaders/quad-vertex.glsl"_s,
+                         "./assets/shaders/quad-fragment.glsl"_s, sb);
 
-    texture_shader = Shader("./vertex-shader-texture.glsl"_s,
-                            "./fragment-shader-texture.glsl"_s, sb);
+    texture_shader = Shader("./assets/shaders/texture-vertex.glsl"_s,
+                            "./assets/shaders/texture-fragment.glsl"_s, sb);
 
     USE[] { // quad
         // create my buffers
@@ -208,11 +208,11 @@ int texture_main(void) {
 
         USE[] {
             int width, height, nrChannels;
-            u8 *data =
-                stbi_load("./container.jpg", &width, &height, &nrChannels, 0);
+            u8 *data = stbi_load("./assets/img/container.jpg", &width, &height,
+                                 &nrChannels, 0);
             assert(nrChannels == 3);
             assert(data);
-            DEFER[data = data] { stbi_image_free(data); };
+            DEFER[data] { stbi_image_free(data); };
 
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
                          GL_UNSIGNED_BYTE, data);
@@ -232,11 +232,11 @@ int texture_main(void) {
         USE[] {
             int width, height, nrChannels;
             stbi_set_flip_vertically_on_load(true);
-            u8 *data =
-                stbi_load("./awesomeface.png", &width, &height, &nrChannels, 0);
+            u8 *data = stbi_load("./assets/img/awesomeface.png", &width,
+                                 &height, &nrChannels, 0);
             assert(nrChannels == 4);
             assert(data);
-            DEFER[data = data] { stbi_image_free(data); };
+            DEFER[data] { stbi_image_free(data); };
 
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA,
                          GL_UNSIGNED_BYTE, data);

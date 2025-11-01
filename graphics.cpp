@@ -68,13 +68,12 @@ GLint Shader::bind(const String &name) {
 
 void Shader::set_int(const String &name, int n) { glUniform1i(bind(name), n); }
 
-void Shader::set_float_4(const String &name, float x, float y, float z,
-                         float w) {
-    glUniform4f(bind(name), x, y, z, w);
+void Shader::set_vec4(const String &name, const glm::vec4 &vector) {
+    glUniform4f(bind(name), vector.x, vector.y, vector.z, vector.w);
 }
 
-void Shader::set_mat_4(const utils::String &name, const glm::mat4 &matrix,
-                       bool transpose) {
+void Shader::set_mat4(const utils::String &name, const glm::mat4 &matrix,
+                      bool transpose) {
     glUniformMatrix4fv(bind(name), 1, transpose, glm::value_ptr(matrix));
 }
 
@@ -117,6 +116,8 @@ GLFWwindow *init(const char *title) {
         result, [](GLFWwindow *window, int width, int height) {
             glViewport(0, 0, width, height);
         });
+
+    glEnable(GL_DEPTH_TEST);
 
     return result;
 }

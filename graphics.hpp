@@ -37,10 +37,9 @@ struct Shader {
     GLint bind(const utils::String &name);
 
     void set_int(const utils::String &name, int n);
-    void set_float_4(const utils::String &name, float x, float y, float z,
-                     float w);
-    void set_mat_4(const utils::String &name, const glm::mat4 &matrix,
-                   bool transpose = false);
+    void set_vec4(const utils::String &name, const glm::vec4 &vector);
+    void set_mat4(const utils::String &name, const glm::mat4 &matrix,
+                  bool transpose = false);
 };
 
 GLFWwindow *init(const char *title);

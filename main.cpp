@@ -7,6 +7,7 @@ using namespace utils;
 
 int texture_main();
 int transformation_main();
+int cord_main();
 
 Table<String, int (*)(void)> mains;
 
@@ -23,6 +24,7 @@ void help() {
 int main(int argc, char **argv) {
     mains["texture"_s] = texture_main;
     mains["transformation"_s] = transformation_main;
+    mains["cord"_s] = cord_main;
     mains["tr"_s] = transformation_main;
     mains["te"_s] = texture_main;
 
