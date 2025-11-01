@@ -54,12 +54,42 @@
 #define UTILS_BREAKPOINT() __asm__("int3")
 #endif
 
-#ifndef UTILS_NO_GLOBAL_ALLOCATOR
-#define UTILS_GLOBAL_ALLOCATOR(VAR) VAR = global_allocator
-#endif
-
 #ifndef UTILS_UNREACHEBLE
 #define UTILS_UNREACHEBLE() assert(false)
+#endif
+
+#define UTILS_VA_ARGS_HEAD(HEAD, ...) HEAD
+#define UTILS_VA_ARGS_TAIL(_HEAD, ...) __VA_ARGS__
+
+#define UTILS__CONCAT(X, Y) X##Y
+#define UTILS_CONCAT(X, Y) UTILS__CONCAT(X, Y)
+
+#define UTILS__STRINGFY(X) #X
+#define UTILS_STRINGFY(X) UTILS__STRINGFY(X)
+
+#define UTILS_ARRAY_LENGTH(X) (sizeof((X)) / sizeof((X)[0]))
+
+#define UTILS_DEFER                                                            \
+    utils::_Defer UTILS_CONCAT(UTILS_CONCAT(__defer__, __COUNTER__), __LINE__) =
+
+#define UTILS_USE                                                              \
+    utils::_Use UTILS_CONCAT(UTILS_CONCAT(__use__, __COUNTER__), __LINE__) =
+
+#define UTILS_ALLOCATOR_INIT(ALLOCATOR_PTR, ALLOCATOR_TYPE, ...)               \
+    ALLOCATOR_PTR = new ALLOCATOR_TYPE(__VA_ARGS__);                           \
+    DEFER[] {                                                                  \
+        ALLOCATOR_PTR->destroy();                                              \
+        delete ALLOCATOR_PTR;                                                  \
+    };
+
+#ifdef UTILS_MACRO_RENAME
+#define VA_ARGS_HEAD UTILS_VA_ARGS_HEAD
+#define VA_ARGS_TAIL UTILS_VA_ARGS_TAIL
+#define CONCAT UTILS_CONCAT
+#define STRINGFY UTILS_STRINGFY
+#define ARRAY_LENGTH UTILS_ARRAY_LENGTH
+#define DEFER UTILS_DEFER
+#define USE UTILS_USE
 #endif
 
 namespace utils {
@@ -88,52 +118,17 @@ typedef uint64_t u64;
 typedef float f32;
 typedef double f64;
 
-#define UTILS_VA_ARGS_HEAD(HEAD, ...) HEAD
-#define UTILS_VA_ARGS_TAIL(_HEAD, ...) __VA_ARGS__
-
-#define UTILS__CONCAT(X, Y) X##Y
-#define UTILS_CONCAT(X, Y) UTILS__CONCAT(X, Y)
-
-#define UTILS__STRINGFY(X) #X
-#define UTILS_STRINGFY(X) UTILS__STRINGFY(X)
-
-#define UTILS_ARRAY_LENGTH(X) (sizeof((X)) / sizeof((X)[0]))
-
-constexpr u64 log2(u64 n) {
-    u64 result = 0;
-    while (n > 1) {
-        n >>= 1;
-        result++;
-    }
-    return result;
-}
-
 template <typename F> struct _Defer {
     F f;
     _Defer(F f) : f(f) {}
     ~_Defer() { f(); }
 };
 
-#define UTILS_DEFER                                                            \
-    utils::_Defer UTILS_CONCAT(UTILS_CONCAT(__defer__, __COUNTER__), __LINE__) =
-
 template <typename F> struct _Use {
     _Use(F f) { f(); }
 };
 
-#define UTILS_USE                                                              \
-    utils::_Use UTILS_CONCAT(UTILS_CONCAT(__use__, __COUNTER__), __LINE__) =
-
-#ifdef UTILS_MACRO_RENAME
-#define VA_ARGS_HEAD UTILS_VA_ARGS_HEAD
-#define VA_ARGS_TAIL UTILS_VA_ARGS_TAIL
-#define CONCAT UTILS_CONCAT
-#define STRINGFY UTILS_STRINGFY
-#define ARRAY_LENGTH UTILS_ARRAY_LENGTH
-#define DEFER UTILS_DEFER
-#define USE UTILS_USE
-#endif
-
+UTILS_PROC u64 log2(u64 n);
 UTILS_PROC ssize ptr_diff(void *a, void *b);
 
 template <typename T> UTILS_PROC T min(T x) { return x; }
@@ -168,8 +163,13 @@ template <typename T> UTILS_PROC void swap(T &a, T &b) {
     b = tmp;
 }
 
-template <typename T> UTILS_PROC void copy(T *src, T *dest) {
-    memcpy(static_cast<T *>(dest), static_cast<T *>(src), sizeof(T));
+// TODO: check if is needed to use memmove or something like that
+template <typename T> UTILS_PROC T *copy(T *src, T *dest, usize length = 1) {
+    if (src == dest)
+        return src;
+
+    return static_cast<T *>(memcpy(static_cast<T *>(dest),
+                                   static_cast<T *>(src), length * sizeof(T)));
 }
 
 template <typename T> struct Reverse {
@@ -265,10 +265,6 @@ struct Allocator {
     UTILS_PROC virtual void *run(void *ptr, usize old_size, usize new_size) = 0;
     UTILS_PROC virtual void destroy() = 0;
     UTILS_PROC virtual void reset() = 0;
-
-    UTILS_PROC operator Allocator *() {
-        return dynamic_cast<Allocator *>(this);
-    }
 };
 
 #ifndef UTILS_NO_GLOBAL_ALLOCATOR
@@ -479,7 +475,7 @@ template <typename T> struct Slice {
     }
 };
 
-template <typename T, Allocator *allocator = nullptr>
+template <typename T, Allocator *&allocator = global_allocator>
 struct Array : public Slice<T> {
     usize capacity;
 
@@ -578,7 +574,7 @@ struct Array : public Slice<T> {
     }
 };
 
-template <typename T, Allocator *allocator = nullptr> struct List {
+template <typename T, Allocator *&allocator = global_allocator> struct List {
     struct Node {
         T head = {};
         Node *tail = nullptr;
@@ -708,7 +704,7 @@ template <typename T, Allocator *allocator = nullptr> struct List {
     // TODO: List chain() {...} // create a cycle
 };
 
-template <typename T, Allocator *allocator = nullptr> struct Tree {
+template <typename T, Allocator *&allocator = global_allocator> struct Tree {
     struct Node {
         T head = {};
         Node *next = nullptr;
@@ -979,7 +975,7 @@ template <typename Key, typename Value,
               return static_cast<const Pair<Key, Value> *>(a)->key <=>
                      static_cast<const Pair<Key, Value> *>(b)->key;
           },
-          Allocator *allocator = nullptr>
+          Allocator *&allocator = global_allocator>
 struct Table : private Array<Pair<Key, Value>, allocator> {
     using Item = Pair<Key, Value>;
     using Base = Array<Item, allocator>;
@@ -1103,21 +1099,18 @@ struct String : public Slice<char> {
         return this->at(this->length + 1) == '\0';
     }
 
-    UTILS_PROC char *zstr() const {
+    UTILS_PROC char *temp_zstr() const {
         static char result[1024] = {0};
-
-        // if (is_zstr())
-        //     return this->items;
 
         UTILS_ASSERT(this->length <= sizeof(result));
         memset(result, 0, sizeof(result));
-        memcpy(result, this->items, this->length);
+        copy(this->items, result, this->length);
 
         return result;
     };
 };
 
-template <Allocator *allocator = nullptr> struct String_Builder {
+template <Allocator *&allocator = global_allocator> struct String_Builder {
     Array<char, allocator> chars;
     Array<usize, allocator> control;
 
@@ -1128,8 +1121,9 @@ template <Allocator *allocator = nullptr> struct String_Builder {
 
     UTILS_PROC String_Builder write(const String &string) {
         chars.reserve(chars.length + string.length);
-        for (usize i = 0; i < string.length; i++)
-            write(string[i]);
+        copy(string.items, &chars.at_raw(chars.length), string.length);
+        chars.length += string.length;
+
         return *this;
     }
 
@@ -1148,14 +1142,40 @@ template <Allocator *allocator = nullptr> struct String_Builder {
         dealloc<char>(chars.items, chars.length, allocator);
         chars.items = nullptr;
         chars.length = 0;
+        chars.capacity = 0;
 
         dealloc<usize>(control.items, control.length, allocator);
         control.items = nullptr;
         control.length = 0;
+        control.capacity = 0;
 
         return *this;
     }
 };
+
+struct Allocator_Temp : public Allocator {
+    Allocator *allocator_ptr;
+
+    UTILS_PROC_DESTRUCT ~Allocator_Temp() {
+        destroy();
+        delete allocator_ptr;
+        delete this;
+    }
+
+    UTILS_PROC void *run(void *ptr, usize old_size, usize new_size) override {
+        return allocator_ptr->run(ptr, old_size, new_size);
+    }
+
+    UTILS_PROC void destroy() override { allocator_ptr->destroy(); }
+
+    UTILS_PROC void reset() override { allocator_ptr->reset(); }
+};
+
+template <typename T> UTILS_PROC Allocator *create_temp_allocator(T allocator) {
+    Allocator_Temp *result = new Allocator_Temp;
+    result->allocator_ptr = new T(allocator);
+    return result;
+}
 
 template <usize N> struct Allocator_Static : public Allocator {
     Slice<u8> pool;
@@ -1183,7 +1203,7 @@ template <usize N> struct Allocator_Static : public Allocator {
 
         // realloc
         if (ptr != nullptr && old_size != 0)
-            std::memcpy(result, ptr, old_size);
+            memcpy(result, ptr, old_size);
 
         return result;
     }
@@ -1225,7 +1245,7 @@ template <usize N> struct Allocator_Ring : public Allocator {
 
         // realloc
         if (ptr != nullptr && old_size != 0)
-            std::memcpy(result, ptr, old_size);
+            memcpy(result, ptr, old_size);
 
         return result;
     }
@@ -1269,11 +1289,9 @@ struct Allocator_Malloc : public Allocator {
                 // remove(i)
                 Slice<void *>(ptrs, length).splice(i, length).rotate(-2);
                 length--;
-
-                return nullptr;
             }
 
-            UTILS_UNREACHEBLE();
+            return nullptr;
         }
 
         void *result =
@@ -1323,26 +1341,15 @@ struct Allocator_Malloc : public Allocator {
 };
 
 template <typename T>
-UTILS_PROC T *alloc(uint count = 1,
-                    Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
-#ifdef UTILS_NO_GLOBAL_ALLOCATOR
+UTILS_PROC T *alloc(uint count = 1, Allocator *allocator = global_allocator) {
     UTILS_ASSERT(allocator != nullptr);
-#else
-    if (allocator == nullptr)
-        allocator = global_allocator;
-#endif
     return static_cast<T *>(allocator->run(nullptr, 0, sizeof(T) * count));
 }
 
 template <typename T>
 UTILS_PROC void dealloc(T *ptr, uint count,
-                        Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
-#ifdef UTILS_NO_GLOBAL_ALLOCATOR
+                        Allocator *allocator = global_allocator) {
     UTILS_ASSERT(allocator != nullptr);
-#else
-    if (allocator == nullptr)
-        allocator = global_allocator;
-#endif
     if (ptr == nullptr || count == 0)
         return;
     allocator->run(ptr, sizeof(T) * count, 0);
@@ -1350,18 +1357,13 @@ UTILS_PROC void dealloc(T *ptr, uint count,
 
 template <typename T>
 UTILS_PROC T *realloc(T *ptr, uint old_count, uint new_count,
-                      Allocator *UTILS_GLOBAL_ALLOCATOR(allocator)) {
-#ifdef UTILS_NO_GLOBAL_ALLOCATOR
+                      Allocator *allocator = global_allocator) {
     UTILS_ASSERT(allocator != nullptr);
-#else
-    if (allocator == nullptr)
-        allocator = global_allocator;
-#endif
     return static_cast<T *>(
         allocator->run(ptr, sizeof(T) * old_count, sizeof(T) * new_count));
 }
 
-template <typename T, Allocator *allocator = nullptr> struct Unique {
+template <typename T, Allocator *&allocator = global_allocator> struct Unique {
     T *ptr;
     usize ptr_count;
 
@@ -1402,7 +1404,7 @@ template <typename T, Allocator *allocator = nullptr> struct Unique {
     UTILS_PROC_DESTRUCT ~Unique() { destroy(); }
 };
 
-template <typename T, Allocator *allocator = nullptr> struct Shared {
+template <typename T, Allocator *&allocator = global_allocator> struct Shared {
     struct Control_Block {
         T *ptr;
         usize ptr_count;
@@ -1495,34 +1497,41 @@ template <typename T, Allocator *allocator = nullptr> struct Shared {
 UTILS_PROC String operator""_s(const char *chars, usize length);
 
 UTILS_PROC String string_from_zstr(char *zstr);
-UTILS_PROC String file_read(String file_path, String_Builder<> &sb);
+UTILS_PROC String file_read(const String &file_path, String_Builder<> &sb);
 } // namespace utils
 
 #ifdef UTILS_IMPLEMENT
+namespace utils {
+Allocator *global_allocator = nullptr;
 
-UTILS_PROC utils::ssize utils::ptr_diff(void *a, void *b) {
+UTILS_PROC u64 log2(u64 n) {
+    u64 result = 0;
+    while (n > 1) {
+        n >>= 1;
+        result++;
+    }
+    return result;
+}
+
+UTILS_PROC ssize ptr_diff(void *a, void *b) {
     return reinterpret_cast<ssize>(a) - reinterpret_cast<ssize>(b);
 }
 
-UTILS_PROC utils::String utils::file_read(utils::String file_path,
-                                          utils::String_Builder<> &sb) {
-    assert(file_path.length <= PATH_MAX);
-    static char path[PATH_MAX + 1] = {0};
-    memcpy(path, file_path.items, file_path.length);
+UTILS_PROC String file_read(const String &path, String_Builder<> &sb) {
+    FILE *file = fopen(path.temp_zstr(), "rb+");
+    UTILS_DEFER[file] { fclose(file); };
 
-    FILE *file = fopen(path, "rb+");
-
-    long tell_old = ftell(file);
-    assert(tell_old >= 0);
+    long start = ftell(file);
+    assert(start >= 0);
 
     fseek(file, 0, SEEK_END);
-    long tell_end = ftell(file);
-    assert(tell_end >= 0);
+    long end = ftell(file);
+    assert(end >= 0);
 
-    assert(tell_end >= tell_old);
-    fseek(file, tell_old, SEEK_SET);
+    assert(end >= start);
+    fseek(file, start, SEEK_SET);
 
-    long read_size = tell_end - tell_old;
+    long read_size = end - start;
     if (read_size <= 0)
         return String();
 
@@ -1534,25 +1543,29 @@ UTILS_PROC utils::String utils::file_read(utils::String file_path,
     return sb.end();
 }
 
-UTILS_PROC utils::String utils::operator""_s(const char *chars, usize length) {
+UTILS_PROC String operator""_s(const char *chars, usize length) {
     return String(const_cast<char *>(chars), length);
 }
 
-UTILS_PROC utils::String utils::string_from_zstr(char *zstr) {
+UTILS_PROC String string_from_zstr(char *zstr) {
     return String(zstr, strlen(zstr));
 }
 
-#ifndef UTILS_NO_GLOBAL_ALLOCATOR
-utils::Allocator *utils::global_allocator = nullptr;
+UTILS_PROC char *zstr_from_string(const String &string, String_Builder<> sb) {
+    char *result = sb.start();
+    sb.write(string);
+    sb.write('\0');
+    sb.end();
+    return result;
+}
 
 UTILS_PROC_INIT void _global_allocator_destroy_init() {
-    static auto _allocator = utils::Allocator_Malloc();
-    utils::global_allocator = &_allocator;
+    static auto _allocator = Allocator_Malloc();
+    global_allocator = &_allocator;
 }
 
 UTILS_PROC_FINI void _global_allocator_destroy_fini() {
-    utils::global_allocator->destroy();
+    global_allocator->destroy();
 }
-#endif
-
+} // namespace utils
 #endif

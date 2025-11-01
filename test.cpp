@@ -8,7 +8,14 @@
 
 using namespace utils;
 
-int main() {
+int main() {}
+
+#if 0
+{
+    static Allocator *other_allocator;
+    UTILS_ALLOCATOR_INIT(other_allocator, Allocator_Ring<1024>);
+    Array<int, other_allocator> wowowowoo{};
+
     USE[] {
         int *p = alloc<int>();
         assert(p != NULL);
@@ -255,7 +262,8 @@ int main() {
         const int end = 5;
 
         auto l0 = Table<String, int>();
-        String keys[end] = {"foo"_s, "bar"_s, "buzz"_s, "quux"_s, "xyzzy"_s};
+        String keys[end] = {"foo"_s, "bar"_s, "buzz"_s, "quux"_s,
+                    "xyzzy"_s};
 
         l0.reserve(abs(end - i));
         for (int it = i; it < end; it++) {
@@ -285,3 +293,4 @@ int main() {
     printf("nice\n");
     return 0;
 }
+#enfi

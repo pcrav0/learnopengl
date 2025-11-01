@@ -84,20 +84,26 @@ static void load_texture(const char *file_path, bool flip = false) {
         assert(data);
         DEFER[data = data] { stbi_image_free(data); };
 
-        uint c;
+        uint format;
         switch (channels) {
+        case 1:
+            format = GL_RED;
+            break;
+        case 2:
+            format = GL_RG;
+            break;
         case 3:
-            c = GL_RGB;
+            format = GL_RGB;
             break;
         case 4:
-            c = GL_RGBA;
+            format = GL_RGBA;
             break;
         default:
             assert(false);
             break;
         }
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, c,
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, format,
                      GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     };
@@ -113,7 +119,8 @@ static void update() {
 }
 
 static void draw() {
-    static Allocator_Ring<1024> tmp_alloc;
+    static Allocator *temp_allocator =
+        create_temp_allocator(Allocator_Ring<1024>());
 
     glClearColor((float)0x18 / 0xff, (float)0x18 / 0xff, (float)0x18 / 0xff,
                  1.0f);
@@ -124,7 +131,7 @@ static void draw() {
 
     assert(textures.length <= 16);
     for (uint i = 0; i < textures.length; i++) {
-        String_Builder<(Allocator *)&tmp_alloc> sb;
+        String_Builder<temp_allocator> sb;
         sb.start();
         sb.write("texture_"_s);
         sb.write('0' + i);
@@ -136,9 +143,9 @@ static void draw() {
     }
 
     glm::mat4 m(1.0f);
-    // m = glm::scale(m, glm::vec3(0.5, 0.5, 0.5));
+    m = glm::scale(m, glm::vec3(0.5, 0.5, 0.5));
+    // m = glm::translate(m, glm::vec3(0.5f, 0.0f, 0.5f));
     m = glm::rotate(m, current_time, glm::vec3(1.0f, 1.0f, 1.0f));
-    m = glm::translate(m, glm::vec3(0.5f, 0.0f, 0.5f));
     shader.set_mat_4("transform"_s, m);
 
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -182,7 +189,7 @@ int transformation_main(void) {
                           (void *)offsetof(Vertice, texture_cord));
     glEnableVertexAttribArray(1);
 
-    load_texture("./wall.jpg");
+    load_texture("./wall.jpg", true);
     load_texture("./awesomeface.png", true);
     assert(textures.length == 2);
 
@@ -191,7 +198,15 @@ int transformation_main(void) {
     while (!glfwWindowShouldClose(window)) {
         update();
         draw();
+        global_allocator->reset();
     }
+
+    glDeleteVertexArrays(1, &vertex_array_object);
+    glDeleteBuffers(1, &vertex_buffer_object);
+    glDeleteBuffers(1, &element_buffer_object);
+    glDeleteProgram(shader.id);
+
+    sb.reset();
 
     return 0;
 }

@@ -1,6 +1,8 @@
 #define UTILS_MACRO_RENAME
 #include "./graphics.hpp"
 
+#include <unistd.h>
+
 GLint max_vertex_attributes;
 
 using utils::String;
@@ -48,7 +50,7 @@ void Shader::compile(uint shader, const String &file_path,
     if (!success) {
         glGetShaderInfoLog(shader, 512, NULL, info_log);
         printf("cant compile this stupid %s shader because: %s\n",
-               file_path.zstr(), info_log);
+               file_path.temp_zstr(), info_log);
         exit(-1);
     }
 }
@@ -56,10 +58,10 @@ void Shader::compile(uint shader, const String &file_path,
 void Shader::use() { glUseProgram(id); }
 
 GLint Shader::bind(const String &name) {
-    GLint result = glGetUniformLocation(id, name.zstr());
+    GLint result = glGetUniformLocation(id, name.temp_zstr());
 
     if (result < 0)
-        printf("[-] cant find `%s` uniform, sorry :(\n", name.zstr());
+        printf("[-] cant find `%s` uniform, sorry :(\n", name.temp_zstr());
 
     return result;
 }
@@ -77,6 +79,8 @@ void Shader::set_mat_4(const utils::String &name, const glm::mat4 &matrix,
 }
 
 GLFWwindow *init(const char *title) {
+    printf("pid: %d\n", getpid());
+
     if (!glfwInit())
         exit(-1);
 

@@ -119,7 +119,7 @@ workspace('test') do
       toolset('clang')
       linkbuildoutputs('On')
 
-      files{ 'test.cpp', 'utils.hpp', }
+      files{ 'test1.cpp', 'utils.hpp', }
 
       filter('configurations:test') do
          defines{ 'DEBUG' }
