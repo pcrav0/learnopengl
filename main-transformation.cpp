@@ -10,25 +10,25 @@
 
 using namespace utils;
 
-static GLFWwindow *window;
-static float current_time;
+GLFWwindow *window;
+float current_time;
 
 // object
 
-static uint vertex_buffer_object;
-static uint vertex_array_object;
-static uint element_buffer_object;
+uint vertex_buffer_object;
+uint vertex_array_object;
+uint element_buffer_object;
 
-static Array<uint> textures;
+Array<uint> textures;
 
-static Shader shader;
+Shader shader;
 
 struct Vertice {
     glm::vec3 pos;
     glm::vec2 texture_cord;
 };
 
-static Vertice vertices[] = {
+Vertice vertices[] = {
     // top right
     {
         .pos = {+0.5f, +0.5f, +0.0f},
@@ -54,12 +54,12 @@ static Vertice vertices[] = {
     },
 };
 
-static uint indices[][3] = {
+uint indices[][3] = {
     {0, 1, 3},
     {1, 2, 3},
 };
 
-static void load_texture(const char *file_path, bool flip = false) {
+void load_texture(const char *file_path, bool flip = false) {
     uint texture;
 
     // load texture wall
@@ -105,7 +105,7 @@ static void load_texture(const char *file_path, bool flip = false) {
     glGenerateMipmap(GL_TEXTURE_2D);
 }
 
-static void update() {
+void update() {
     if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
@@ -114,7 +114,7 @@ static void update() {
     glfwPollEvents();
 }
 
-static void draw() {
+void draw() {
     static Allocator *temp_allocator =
         create_temp_allocator(Allocator_Ring<1024>());
 
@@ -149,7 +149,7 @@ static void draw() {
     glfwSwapBuffers(window);
 }
 
-int transformation_main(void) {
+int main(void) {
     String_Builder<> sb;
 
     window = init("transformation");

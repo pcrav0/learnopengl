@@ -21,8 +21,7 @@ premake5 gmake
 
 ## debug mode
 ``` sh
-make -f game.make verbose=true config=debug -j$(nproc)
-./bin/debug/main texture
+./run texture
 ```
 
 ## release mode

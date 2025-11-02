@@ -1,5 +1,74 @@
+function join(a, b)
+   local result = {}
+
+   for _, v in ipairs(a) do
+      table.insert(result, v)
+   end
+
+   for _, v in ipairs(b) do
+      table.insert(result, v)
+   end
+
+   return result
+end
+
 function sh(cmd)
    return io.popen(cmd):read('*a')
+end
+
+function main_setup(extra_files)
+   assert(#extra_files > 0)
+
+   kind('ConsoleApp')
+   language('C++')
+   cppdialect('C++23')
+   targetdir('bin/%{cfg.buildcfg}')
+   toolset('clang')
+
+   linkbuildoutputs('On')
+
+   libdirs { 'obj/%{cfg.buildcfg}' }
+
+   links{
+      'utils', 'graphics',
+      'glad', 'stb_image',
+   }
+   linkoptions{
+      '-lGL',
+      '-lglfw',
+
+      '-lX11',
+      '-lXrandr',
+      '-lXi',
+
+      '-lpthread',
+      '-ldl',
+   }
+
+   --files(join(extra_files, {'utils.hpp','utils.cpp','graphics.hpp','graphics.cpp'}))
+   files(extra_files)
+
+   filter('files:vertex_shaders.glsl') do
+      buildinputs{ 'vertex_shaders.glsl' }
+      buildaction('FxCompile')
+   end
+
+   filter{ 'system:linux', 'action:gmake' } do
+      buildoptions{ '-pipe' }
+   end
+
+   filter('configurations:debug') do
+      -- buildoptions{ '-fsanitize=memory', '-fno-omit-frame-pointer', '-fno-optimize-sibling-calls' }
+      -- linkoptions { sh('pkg-config --libs fmt') }
+      defines{ 'DEBUG=true' }
+      symbols('On')
+   end
+
+   filter('configurations:release') do
+      buildoptions{ '-fno-exceptions' }
+      defines{ 'DEBUG=false', 'RELEASE', 'UTILS_ASSERT=UTILS_IGNORE' }
+      optimize('On')
+   end
 end
 
 workspace('game') do
@@ -10,55 +79,58 @@ workspace('game') do
       './thirdparty/glm/',
    }
 
-   project('main') do
-      kind('ConsoleApp')
+   project('cord') do
+      main_setup{'./main-cord.cpp'}
+   end
+
+   project('texture') do
+      main_setup{'./main-texture.cpp'}
+   end
+
+   project('transformation') do
+      main_setup{'./main-transformation.cpp'}
+   end
+
+   project('cam') do
+      main_setup{'./main-cam.cpp'}
+   end
+
+   project('utils') do
+      kind('SharedLib')
       language('C++')
       cppdialect('C++23')
-      targetdir('bin/%{cfg.buildcfg}')
+      targetdir('obj/%{cfg.buildcfg}')
       toolset('clang')
 
-      linkbuildoutputs('On')
-
-      libdirs { 'obj/%{cfg.buildcfg}' }
-
-      links{ 'glad', 'stb_image' }
-      linkoptions{
-         '-lGL',
-         '-lglfw',
-
-         '-lX11',
-         '-lXrandr',
-         '-lXi',
-
-         '-lpthread',
-         '-ldl',
-      }
-
-      files{
-         'utils.hpp', 'utils.cpp',
-         'graphics.hpp', 'graphics.cpp',
-         'main.cpp', 'main-texture.cpp', 'main-transformation.cpp', 'main-cord.cpp',
-      }
-
-      filter('files:vertex_shaders.glsl') do
-         buildinputs{ 'vertex_shaders.glsl' }
-         buildaction('FxCompile')
-      end
-
-      filter{ 'system:linux', 'action:gmake' } do
-         buildoptions{ '-pipe' }
-      end
+      files{ 'utils.hpp', 'utils.cpp' }
 
       filter('configurations:debug') do
-         -- buildoptions{ '-fsanitize=memory', '-fno-omit-frame-pointer', '-fno-optimize-sibling-calls' }
-         -- linkoptions { sh('pkg-config --libs fmt') }
          defines{ 'DEBUG=true' }
          symbols('On')
       end
 
       filter('configurations:release') do
-         buildoptions{ '-fno-exceptions' }
-         defines{ 'DEBUG=false', 'RELEASE', 'UTILS_ASSERT=UTILS_IGNORE' }
+         defines{ 'DEBUG=false', 'RELEASE' }
+         optimize('On')
+      end
+   end
+
+   project('graphics') do
+      kind('SharedLib')
+      language('C++')
+      cppdialect('C++23')
+      targetdir('obj/%{cfg.buildcfg}')
+      toolset('clang')
+
+      files{ 'graphics.hpp', 'graphics.cpp' }
+
+      filter('configurations:debug') do
+         defines{ 'DEBUG=true' }
+         symbols('On')
+      end
+
+      filter('configurations:release') do
+         defines{ 'DEBUG=false', 'RELEASE' }
          optimize('On')
       end
    end

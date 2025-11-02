@@ -105,7 +105,7 @@ static void draw() {
     glfwSwapBuffers(window);
 }
 
-int texture_main(void) {
+int main(void) {
     DEFER[] { glDeleteVertexArrays(1, &quad_vertex_array_object); };
     DEFER[] { glDeleteBuffers(1, &quad_vertex_buffer_object); };
     DEFER[] { glDeleteBuffers(1, &quad_element_buffer_object); };

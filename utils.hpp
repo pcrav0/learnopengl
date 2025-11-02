@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <math.h>
 #include <stdio.h>
 
 #include <utility>
@@ -42,7 +43,7 @@
 #endif
 
 #ifndef UTILS_PROC_DESTRUCT
-#define UTILS_PROC_DESTRUCT UTILS_PROC
+#define UTILS_PROC_DESTRUCT UTILS_PROC virtual
 #endif
 
 #ifndef UTILS_ASSER
@@ -118,18 +119,12 @@ typedef uint64_t u64;
 typedef float f32;
 typedef double f64;
 
-template <typename F> struct _Defer {
-    F f;
-    _Defer(F f) : f(f) {}
-    ~_Defer() { f(); }
-};
+extern "C" {
+extern u64 random_state;
 
-template <typename F> struct _Use {
-    _Use(F f) { f(); }
-};
-
-UTILS_PROC u64 log2(u64 n);
+UTILS_PROC f32 random_norm();
 UTILS_PROC ssize ptr_diff(void *a, void *b);
+};
 
 template <typename T> UTILS_PROC T min(T x) { return x; }
 
@@ -171,6 +166,16 @@ template <typename T> UTILS_PROC T *copy(T *src, T *dest, usize length = 1) {
     return static_cast<T *>(memcpy(static_cast<T *>(dest),
                                    static_cast<T *>(src), length * sizeof(T)));
 }
+
+template <typename F> struct _Defer {
+    F f;
+    _Defer(F f) : f(f) {}
+    ~_Defer() { f(); }
+};
+
+template <typename F> struct _Use {
+    _Use(F f) { f(); }
+};
 
 template <typename T> struct Reverse {
     struct iterator {
@@ -267,9 +272,30 @@ struct Allocator {
     UTILS_PROC virtual void reset() = 0;
 };
 
-#ifndef UTILS_NO_GLOBAL_ALLOCATOR
 extern Allocator *global_allocator;
-#endif
+
+template <typename T>
+UTILS_PROC T *alloc(uint count = 1, Allocator *allocator = global_allocator) {
+    UTILS_ASSERT(allocator != nullptr);
+    return static_cast<T *>(allocator->run(nullptr, 0, sizeof(T) * count));
+}
+
+template <typename T>
+UTILS_PROC void dealloc(T *ptr, uint count,
+                        Allocator *allocator = global_allocator) {
+    UTILS_ASSERT(allocator != nullptr);
+    if (ptr == nullptr || count == 0)
+        return;
+    allocator->run(ptr, sizeof(T) * count, 0);
+}
+
+template <typename T>
+UTILS_PROC T *realloc(T *ptr, uint old_count, uint new_count,
+                      Allocator *allocator = global_allocator) {
+    UTILS_ASSERT(allocator != nullptr);
+    return static_cast<T *>(
+        allocator->run(ptr, sizeof(T) * old_count, sizeof(T) * new_count));
+}
 
 template <typename T> struct Slice {
     struct iterator {
@@ -1171,12 +1197,6 @@ struct Allocator_Temp : public Allocator {
     UTILS_PROC void reset() override { allocator_ptr->reset(); }
 };
 
-template <typename T> UTILS_PROC Allocator *create_temp_allocator(T allocator) {
-    Allocator_Temp *result = new Allocator_Temp;
-    result->allocator_ptr = new T(allocator);
-    return result;
-}
-
 template <usize N> struct Allocator_Static : public Allocator {
     Slice<u8> pool;
     usize used;
@@ -1340,29 +1360,6 @@ struct Allocator_Malloc : public Allocator {
     UTILS_PROC void reset() override { length = 0; }
 };
 
-template <typename T>
-UTILS_PROC T *alloc(uint count = 1, Allocator *allocator = global_allocator) {
-    UTILS_ASSERT(allocator != nullptr);
-    return static_cast<T *>(allocator->run(nullptr, 0, sizeof(T) * count));
-}
-
-template <typename T>
-UTILS_PROC void dealloc(T *ptr, uint count,
-                        Allocator *allocator = global_allocator) {
-    UTILS_ASSERT(allocator != nullptr);
-    if (ptr == nullptr || count == 0)
-        return;
-    allocator->run(ptr, sizeof(T) * count, 0);
-}
-
-template <typename T>
-UTILS_PROC T *realloc(T *ptr, uint old_count, uint new_count,
-                      Allocator *allocator = global_allocator) {
-    UTILS_ASSERT(allocator != nullptr);
-    return static_cast<T *>(
-        allocator->run(ptr, sizeof(T) * old_count, sizeof(T) * new_count));
-}
-
 template <typename T, Allocator *&allocator = global_allocator> struct Unique {
     T *ptr;
     usize ptr_count;
@@ -1494,6 +1491,12 @@ template <typename T, Allocator *&allocator = global_allocator> struct Shared {
     UTILS_PROC_DESTRUCT ~Shared() { control->destroy(); }
 };
 
+template <typename T> UTILS_PROC Allocator *create_temp_allocator(T allocator) {
+    Allocator_Temp *result = new Allocator_Temp;
+    result->allocator_ptr = new T(allocator);
+    return result;
+}
+
 UTILS_PROC String operator""_s(const char *chars, usize length);
 
 UTILS_PROC String string_from_zstr(char *zstr);
@@ -1503,14 +1506,21 @@ UTILS_PROC String file_read(const String &file_path, String_Builder<> &sb);
 #ifdef UTILS_IMPLEMENT
 namespace utils {
 Allocator *global_allocator = nullptr;
+u64 random_state = 1ULL << 31 | 1;
 
-UTILS_PROC u64 log2(u64 n) {
-    u64 result = 0;
-    while (n > 1) {
-        n >>= 1;
-        result++;
+UTILS_PROC f32 random_norm() {
+    u32 full = 0;
+    usize full_size = sizeof(full) * 8;
+
+    for (uint i = 0; i < full_size; i++) {
+        random_state ^= random_state >> 7;
+        random_state ^= random_state << 9;
+        random_state ^= random_state >> 13;
+
+        full = full | (random_state & 1) << i;
     }
-    return result;
+
+    return ((float)full / ~(1L << full_size)) * -1;
 }
 
 UTILS_PROC ssize ptr_diff(void *a, void *b) {

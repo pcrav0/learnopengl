@@ -5,6 +5,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "graphics.hpp"
 
@@ -75,17 +76,21 @@ static Vertice vertices[] = {
     {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f}},
 };
 
-glm::vec3 cubes_pos[] = {
+static uint indices[][3] = {
+    // {0, 1, 3},
+    // {1, 2, 3},
+};
+
+static glm::vec3 cubes_pos[10] = {
     {0.0f, 0.0f, 0.0f},     {2.0f, 5.0f, -15.0f}, {-1.5f, -2.2f, -2.5f},
     {-3.8f, -2.0f, -12.3f}, {2.4f, -0.4f, -3.5f}, {-1.7f, 3.0f, -7.5f},
     {1.3f, -2.0f, -2.5f},   {1.5f, 2.0f, -2.5f},  {1.5f, 0.2f, -1.5f},
     {-1.3f, 1.0f, -1.5f},
 };
 
-static uint indices[][3] = {
-    // {0, 1, 3},
-    // {1, 2, 3},
-};
+static glm::vec4 cubes_rot[10] = {};
+
+static f32 random_norm_neg() { return random_norm() * 2.0f - 1.0f; }
 
 static void load_texture(const char *file_path, bool flip = false) {
     uint texture;
@@ -165,8 +170,10 @@ static void draw() {
         glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, textures[i]);
     }
+
     glm::mat4 view =
         glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
+
     glm::mat4 projection =
         glm::perspective(glm::radians(45.0f),
                          (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -176,10 +183,13 @@ static void draw() {
 
     for (uint i = 0; i < ARRAY_LENGTH(cubes_pos); i++) {
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, cubes_pos[i]);
-        float angle = 20.0f * (i + 1);
+        glm::vec3 pos = cubes_pos[i];
+        glm::vec4 rot = cubes_rot[i];
+
+        model = glm::translate(model, pos);
+        float angle = rot.w * 100.0f;
         model = glm::rotate(model, current_time * glm::radians(angle),
-                            glm::vec3(1.0f, 0.3f, 0.5f));
+                            glm::vec3(rot) * 2.0f);
         shader.set_mat4("model"_s, model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
     }
@@ -187,11 +197,13 @@ static void draw() {
     glfwSwapBuffers(window);
 }
 
-int cord_main(void) {
+int main(void) {
     String_Builder<> sb;
 
     window = init("cord");
     DEFER[] { glfwTerminate(); };
+
+    glEnable(GL_DEPTH_TEST);
 
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
@@ -223,11 +235,17 @@ int cord_main(void) {
                           (void *)offsetof(Vertice, texture_cord));
     glEnableVertexAttribArray(1);
 
-    load_texture("./assets/img/container.jpg", true);
+    load_texture("./assets/img/wall.jpg", true);
     load_texture("./assets/img/awesomeface.png", true);
     assert(textures.length == 2);
 
     glBindVertexArray(0);
+
+    random_state = time(nullptr);
+    for (uint i = 0; i < ARRAY_LENGTH(cubes_rot); i++) {
+        cubes_rot[i] = glm::vec4(random_norm_neg(), random_norm_neg(),
+                                 random_norm_neg(), random_norm_neg());
+    }
 
     while (!glfwWindowShouldClose(window)) {
         update();

@@ -117,7 +117,5 @@ GLFWwindow *init(const char *title) {
             glViewport(0, 0, width, height);
         });
 
-    glEnable(GL_DEPTH_TEST);
-
     return result;
 }
