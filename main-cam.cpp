@@ -16,6 +16,7 @@ using namespace utils;
 
 static GLFWwindow *window;
 static float current_time;
+static float delta_time;
 
 // object
 
@@ -91,10 +92,12 @@ static uint indices[][3] = {
 };
 
 static struct {
-    glm::vec3 pos;
-    glm::vec3 target;
-    glm::vec3 direction;
-} cam;
+    glm::vec3 pos, front, up;
+    float yaw = -90.0f, pitch = 0.0f, fov = 45.0f;
+} camera;
+
+static float acc = 0.0f;
+static float vel = 0.0f;
 
 static f32 random_norm_neg() { return random_norm() * 2.0f - 1.0f; }
 
@@ -145,10 +148,45 @@ static void load_texture(const char *file_path, bool flip = false) {
 }
 
 static void update() {
+    static float last_time;
+
+    current_time = glfwGetTime();
+    delta_time = current_time - last_time;
+    last_time = current_time;
+
     if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    current_time = glfwGetTime();
+    const float camera_speed = 2.5f * delta_time;
+
+    vel = clamp(vel + acc * delta_time, -100.0f, 100.0f);
+    acc = clamp(acc - 1500.0f * delta_time, -10.0f, 100.0f);
+    camera.pos.y = clamp(camera.pos.y + vel * delta_time, 0.0f, 10000.0f);
+
+    if (camera.pos.y == 0) {
+        vel = 0.0f;
+        acc = 0.0f;
+    }
+
+    printf("%.2f, %.2f\n", acc, vel);
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && camera.pos.y == 0) {
+        acc = 100.0f;
+        vel = 3.0f;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        camera.pos += camera_speed * camera.front;
+
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        camera.pos -= camera_speed * camera.front;
+
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        camera.pos -=
+            glm::normalize(glm::cross(camera.front, camera.up)) * camera_speed;
+
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        camera.pos +=
+            glm::normalize(glm::cross(camera.front, camera.up)) * camera_speed;
 
     glfwPollEvents();
 }
@@ -177,9 +215,10 @@ static void draw() {
         glBindTexture(GL_TEXTURE_2D, textures[i]);
     }
     glm::mat4 view =
-        glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
+        glm::lookAt(camera.pos, camera.pos + camera.front, camera.up);
+
     glm::mat4 projection =
-        glm::perspective(glm::radians(45.0f),
+        glm::perspective(glm::radians(camera.fov),
                          (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
     shader.set_mat4("projection"_s, projection);
@@ -250,6 +289,48 @@ int main(void) {
         cubes_rot[i] = glm::vec4(random_norm_neg(), random_norm_neg(),
                                  random_norm_neg(), random_norm_neg());
     }
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, [](GLFWwindow *window, double xpos,
+                                        double ypos) {
+        static bool frist_input = true;
+        static float last_x = 400.0f, last_y = 300.0f;
+
+        if (frist_input) {
+            last_x = xpos;
+            last_y = ypos;
+            frist_input = false;
+        }
+
+        float xoffset = xpos - last_x;
+        float yoffset = last_y - ypos;
+        last_x = xpos;
+        last_y = ypos;
+
+        float sensitivity = 0.1f;
+        xoffset *= sensitivity;
+        yoffset *= sensitivity;
+
+        camera.yaw += xoffset;
+        camera.pitch = clamp(camera.pitch + yoffset, -89.0f, 89.0f);
+
+        glm::vec3 direction(
+            cos(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch)),
+            sin(glm::radians(camera.pitch)),
+            sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch)));
+        camera.front = glm::normalize(direction);
+    });
+
+    glfwSetScrollCallback(
+        window, [](GLFWwindow *window, double xoffset, double yoffset) {
+            camera.fov = clamp(camera.fov - (float)yoffset, 1.0f, 45.0f);
+        });
+
+    camera.pos = glm::vec3(0.0f, 0.0f, 3.0f);
+    camera.front = glm::vec3(0.0f, 0.0f, -1.0f);
+    camera.up = glm::vec3(0.0f, 1.0f, 0.0f);
+
+    update();
 
     while (!glfwWindowShouldClose(window)) {
         update();

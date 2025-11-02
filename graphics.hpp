@@ -43,5 +43,3 @@ struct Shader {
 };
 
 GLFWwindow *init(const char *title);
-
-glm::mat4 camera(float Translate, glm::vec2 const &Rotate);

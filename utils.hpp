@@ -270,6 +270,8 @@ struct Allocator {
     UTILS_PROC virtual void *run(void *ptr, usize old_size, usize new_size) = 0;
     UTILS_PROC virtual void destroy() = 0;
     UTILS_PROC virtual void reset() = 0;
+
+    UTILS_PROC_DESTRUCT ~Allocator() {}
 };
 
 extern Allocator *global_allocator;
@@ -1184,6 +1186,7 @@ struct Allocator_Temp : public Allocator {
 
     UTILS_PROC_DESTRUCT ~Allocator_Temp() {
         destroy();
+        // hfjsdah
         delete allocator_ptr;
         delete this;
     }
