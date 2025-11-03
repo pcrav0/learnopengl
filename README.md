@@ -3,6 +3,16 @@
 - box2d.org
 - imgui
 
+# tools
+## 2d
+- aseprite
+- krita
+- tiled
+
+## 3d
+- trenchbroom
+- blender
+
 # TODO
 - [ ] https://en.wikipedia.org/wiki/Block_sort
 - [ ] lazy lits

@@ -1,0 +1,170 @@
+@startuml
+!theme amiga
+
+skinparam groupInheritance 1
+
+struct Maybe<T> <<monad>> {
+    T item
+    bool has
+}
+
+struct Pair<T, U> {
+    T a
+    U b
+}
+
+struct Result<V, E> <<monad>> {
+    V value
+    E error
+    bool has_value
+}
+
+struct Reverse<T> <<iterable>>
+struct Range<T> <<iterable>>
+
+interface Allocator {
+    void *run(void *ptr, usize old_size, usize new_size)
+    void reset()
+    void destroy()
+}
+
+struct Allocator_Static implements Allocator {
+    Slice<u8> pool
+    usize used
+}
+
+struct Allocator_Ring implements Allocator {
+    Slice<u8> pool
+    usize used
+}
+
+struct Allocator_Malloc implements Allocator {
+    void **ptrs
+    usize length
+    usize capacity
+}
+
+struct Allocator_Arena #red implements Allocator {
+    void *items
+    usize length
+    usize capacity
+    Allocator_Arena *next
+}
+
+struct Allocator_Stack #red implements Allocator 
+
+struct Allocator_Free_List #red implements Allocator 
+
+struct Allocator_Buddy #red implements Allocator 
+
+struct Pool #red
+note top: pool allocator
+
+struct Allocator_Temp implements Allocator {
+    Allocator *allocator_ptr
+    \~Allocator_Temp()
+}
+
+struct List<T> <<iterable>> {
+    List::Node<T> *node
+}
+
+List ..> Allocator
+
+struct List::Node<T> {
+    T head
+    List::Node<T> *tail
+}
+
+List::Node +-- List
+
+struct Tree<T> <<iterable>> {
+    Tree::Node<T> *node
+}
+
+Tree ..> Allocator
+
+struct Tree::Node<T> {
+    T head
+    Tree::Node<T> *next
+    Tree::Node<T> *prev
+}
+
+Tree::Node +-- Tree
+
+struct Slice<T> <<iterable>> {
+    T* items
+    usize length
+}
+
+struct Bits <<iterable>> #red extends Slice
+
+struct Array<T> <<iterable>> extends Slice<T> {
+    usize capacity
+}
+
+Array ..> Allocator
+
+struct Set<T> <<iterable>> #red extends Array<T>{
+}
+
+struct Table<K, V> <<iterable>> extends Array<Pair<K, V>>{
+}
+
+Table ..> Allocator
+
+struct Hash_Table<K, V> <<iterable>> #red extends Array<Pair<V, List<V>>> {
+}
+
+Hash_Table ..> Allocator
+
+struct Deque<T> <<iterable>> #red extends Array
+struct Queue<T> <<iterable>> #red extends Array
+
+struct String <<iterable>> extends Slice
+
+struct String_Builder
+
+String_Builder ..> Allocator
+
+struct Unique<T> {
+    T *ptr
+    usize ptr_count
+
+    \~Unique()
+}
+
+Unique ..> Allocator
+
+struct Shared<T> {
+    Shared::Control_Block<T> *control
+}
+
+Shared ..> Allocator
+
+struct Shared::Control_Block<T> {
+    T *ptr
+    usize ptr_count
+    uint *counter
+
+    \~Shared()
+}
+
+Shared::Control_Block +-- Shared
+
+struct Lazy_List<T> <<iterable>> #red {
+    T *head
+    {field} function<Lazy_List<T>()> tail
+}
+
+Lazy_List ..> Allocator
+
+struct Lazy_Tree<T> <<iterable>> #red {
+    T *head
+    {field} function<Lazy_Tree<T>()> next
+    {field} function<Lazy_Tree<T>()> prev
+}
+
+Lazy_Tree ..> Allocator
+
+@enduml
