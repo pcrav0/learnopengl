@@ -501,6 +501,18 @@ template <typename T> struct Slice {
 
         return none<usize>();
     }
+
+    UTILS_PROC Slice push_ring(const T &value) {
+        rotate(-2);
+        at(-1) = value;
+        return *this;
+    }
+
+    UTILS_PROC Slice unshift_ring(const T &value) {
+        rotate(1);
+        at(0) = value;
+        return *this;
+    }
 };
 
 template <typename T, Allocator *&allocator = global_allocator>

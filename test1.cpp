@@ -29,6 +29,30 @@ int main() {
         assert(q[1] == 8);
     };
     USE[] {
+        Slice<int> s(alloc<int>(10), 10);
+        for (int i = 0; i < s.length; i++) {
+            s[i] = i;
+        }
+
+        assert(s.length == 10);
+        assert(s[0] == 0);
+        assert(s[1] == 1);
+        assert(s[8] == 8);
+        assert(s[9] == 9);
+
+        s.push_ring(69);
+        assert(s[0] == 1);
+        assert(s[1] == 2);
+        assert(s[8] == 9);
+        assert(s[9] == 69);
+
+        s.unshift_ring(420);
+        assert(s[0] == 420);
+        assert(s[1] == 1);
+        assert(s[8] == 8);
+        assert(s[9] == 9);
+    };
+    USE[] {
         int *p = alloc<int>();
         *p = 69;
 
