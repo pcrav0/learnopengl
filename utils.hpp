@@ -346,13 +346,15 @@ template <typename T> struct Slice {
     T *items;
     usize length;
 
-    UTILS_PROC_CONSTRUCT Slice() : items{nullptr}, length{0} {}
+    UTILS_PROC_CONSTRUCT Slice() : items(nullptr), length(0) {}
 
     UTILS_PROC_CONSTRUCT Slice(T *items, usize length)
-        : items{items}, length{length} {}
+        : items(items), length(length) {}
 
-    // UTILS_PROC Slice(std::initializer_list<T> values)
-    //     : items{(T *)(values.begin())}, length{values.size()} {}
+    UTILS_PROC_CONSTRUCT Slice(std::initializer_list<T> values)
+        : length(values.size()) {
+        items = (T *)values.begin();
+    }
 
     UTILS_PROC T &at_raw(ssize index) const { return items[index]; }
 

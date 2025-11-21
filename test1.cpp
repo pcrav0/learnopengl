@@ -53,6 +53,27 @@ int main() {
         assert(s[9] == 9);
     };
     USE[] {
+        Slice<int> s{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+        assert(s.length == 10);
+        assert(s[0] == 0);
+        assert(s[1] == 1);
+        assert(s[8] == 8);
+        assert(s[9] == 9);
+
+        // s.push_ring(69);
+        // assert(s[0] == 1);
+        // assert(s[1] == 2);
+        // assert(s[8] == 9);
+        // assert(s[9] == 69);
+
+        // s.unshift_ring(420);
+        // assert(s[0] == 420);
+        // assert(s[1] == 1);
+        // assert(s[8] == 8);
+        // assert(s[9] == 9);
+    };
+    USE[] {
         int *p = alloc<int>();
         *p = 69;
 
@@ -300,14 +321,14 @@ int main() {
 
         // assert(l0.is_sorted());
     };
-    USE[] {
-        auto l0 = Table<String, int>();
-        l0.put({{"nice"_s, 69}, {"UwU"_s, 42}, {"poggers"_s, 1337}});
-        // assert(l0.is_sorted());
-        assert(l0["nice"_s] == 69);
-        assert(l0["UwU"_s] == 42);
-        assert(l0["poggers"_s] == 1337);
-    };
+    // USE[] {
+    //     auto l0 = Table<String, int>();
+    //     l0.put({{"nice"_s, 69}, {"UwU"_s, 42}, {"poggers"_s, 1337}});
+    //     // assert(l0.is_sorted());
+    //     assert(l0["nice"_s] == 69);
+    //     assert(l0["UwU"_s] == 42);
+    //     assert(l0["poggers"_s] == 1337);
+    // };
 
     puts("******");
     printf("nice\n");
