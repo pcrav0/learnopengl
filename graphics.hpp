@@ -42,4 +42,25 @@ struct Shader {
                   bool transpose = false);
 };
 
+// static struct {
+//     glm::vec3 pos, front, up;
+//     float yaw = -90.0f, pitch = 0.0f, fov = 45.0f;
+// } camera;
+
+struct Texture {
+    GLuint id = -1;
+};
+
 GLFWwindow *init(const char *title);
+
+struct DrawOptions {
+    Texture texture;
+    glm::vec4 color = glm::vec4(1.0f);
+    glm::vec3 rotation = glm::vec3(1.0f);
+    glm::vec3 scale = glm::vec3(1.0f);
+    glm::vec3 translate = glm::vec3(0);
+};
+
+void triagle_draw(glm::vec2 pos, DrawOptions opts = {});
+void quad_draw(glm::vec2 pos, DrawOptions opts = {});
+void cube_draw(glm::vec3 pos, DrawOptions opts = {});

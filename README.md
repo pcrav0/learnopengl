@@ -2,6 +2,7 @@
 - luajit 5.2
 - box2d.org
 - imgui
+- https://github.com/orangeduck/tgc
 
 # tools
 ## 2d
@@ -31,7 +32,7 @@ premake5 gmake
 
 ## debug mode
 ``` sh
-./run texture
+./run.sh texture
 ```
 
 ## release mode
@@ -47,5 +48,7 @@ make -f test.make verbose=true config=test -j$(nproc)
 ```
 
 # credits
+- https://learnopengl.com/
 - https://gist.github.com/MangaD/fde1290be3e8b362ed524117382e9a47
 - https://github.com/Javier-varez/Ditto
+- https://gist.github.com/liam-middlebrook/c52b069e4be2d87a6d2f

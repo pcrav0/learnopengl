@@ -1,3 +1,5 @@
+#!/bin/sh
+
 if [ -z "$1" ]; then
     echo '??? no'
     exit 1
