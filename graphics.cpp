@@ -3,6 +3,8 @@
 
 #include <unistd.h>
 
+static ImGuiIO *imgui_io = nullptr;
+
 GLint max_vertex_attributes;
 
 using utils::String;
@@ -68,6 +70,14 @@ GLint Shader::bind(const String &name) {
 
 void Shader::set_int(const String &name, int n) { glUniform1i(bind(name), n); }
 
+void Shader::set_float(const String &name, float n) {
+    glUniform1f(bind(name), n);
+}
+
+void Shader::set_vec3(const String &name, const glm::vec3 &vector) {
+    glUniform3f(bind(name), vector.x, vector.y, vector.z);
+}
+
 void Shader::set_vec4(const String &name, const glm::vec4 &vector) {
     glUniform4f(bind(name), vector.x, vector.y, vector.z, vector.w);
 }
@@ -77,7 +87,7 @@ void Shader::set_mat4(const utils::String &name, const glm::mat4 &matrix,
     glUniformMatrix4fv(bind(name), 1, transpose, glm::value_ptr(matrix));
 }
 
-GLFWwindow *init(const char *title) {
+GLFWwindow *init(const char *title, int width, int height) {
     printf("pid: %d\n", getpid());
 
     if (!glfwInit())
@@ -98,12 +108,37 @@ GLFWwindow *init(const char *title) {
     glfwWindowHintString(GLFW_X11_INSTANCE_NAME, "#DEBUG");
 #endif
 
-    GLFWwindow *result = glfwCreateWindow(640, 480, title, NULL, NULL);
+    float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(
+        glfwGetPrimaryMonitor()); // Valid on GLFW 3.3+ only
+    GLFWwindow *result = glfwCreateWindow(
+        main_scale * width, main_scale * height, title, NULL, NULL);
 
     if (!result)
         exit(-1);
 
     glfwMakeContextCurrent(result);
+    glfwSwapInterval(1);
+
+    {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        imgui_io = &ImGui::GetIO();
+        imgui_io->ConfigFlags |=
+            ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+        imgui_io->ConfigFlags |=
+            ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
+        ImGui::StyleColorsDark();
+        ImGuiStyle &style = ImGui::GetStyle();
+        style.ScaleAllSizes(
+            main_scale); // Bake a fixed style scale. (until we have a solution
+                         // for dynamic style scaling, changing this requires
+                         // resetting Style + calling this again)
+        style.FontScaleDpi =
+            main_scale; // Set initial font scale. (using
+                        // io.ConfigDpiScaleFonts=true makes this unnecessary.
+                        // We leave both here for documentation purpose)
+    }
+    ImGui_ImplOpenGL3_Init("#version 330 core");
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         exit(-1);

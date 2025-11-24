@@ -32,6 +32,7 @@ function main_setup(extra_files)
    links{
       'utils', 'graphics',
       'glad', 'stb_image',
+      'imgui',
    }
    linkoptions{
       '-lGL',
@@ -77,7 +78,13 @@ workspace('game') do
       './thirdparty/stb_image/',
       './thirdparty/glad/include',
       './thirdparty/glm/',
+      './thirdparty/imgui/',
+      './thirdparty/imgui/backends/',
    }
+
+   project('color') do
+      main_setup{'./main-color.cpp'}
+   end
 
    project('cord') do
       main_setup{'./main-cord.cpp'}
@@ -167,6 +174,39 @@ workspace('game') do
       toolset('gcc')
 
       files{ loc..'/stb_image.c' }
+
+      filter('configurations:debug') do
+         defines{ 'DEBUG=true' }
+         symbols('On')
+      end
+
+      filter('configurations:release') do
+         defines{ 'DEBUG=false', 'RELEASE' }
+         optimize('On')
+      end
+   end
+
+   project('imgui') do
+      local loc = './thirdparty/imgui/'
+      location(loc)
+
+      kind('StaticLib')
+      language('C++')
+      cppdialect('C++23')
+      targetdir('obj/%{cfg.buildcfg}')
+      toolset('clang')
+
+      includedirs { loc }
+
+      files{
+         loc..'/imgui.cpp',
+         loc..'/imgui_draw.cpp',
+         loc..'/imgui_widgets.cpp',
+         loc..'/imgui_demo.cpp',
+         loc..'/imgui_tables.cpp',
+         loc..'/backends/imgui_impl_glfw.cpp',
+         loc..'/backends/imgui_impl_opengl3.cpp',
+      }
 
       filter('configurations:debug') do
          defines{ 'DEBUG=true' }

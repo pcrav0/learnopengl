@@ -9,6 +9,7 @@
 - aseprite
 - krita
 - tiled
+- trench broom
 
 ## 3d
 - trenchbroom
