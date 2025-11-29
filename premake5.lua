@@ -82,8 +82,8 @@ workspace('game') do
       './thirdparty/imgui/backends/',
    }
 
-   project('color') do
-      main_setup{'./main-color.cpp'}
+   project('light') do
+      main_setup{'./main-light.cpp'}
    end
 
    project('cord') do
