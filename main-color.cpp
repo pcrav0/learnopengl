@@ -20,7 +20,7 @@ static GLuint vertex_buffer_object, vertex_array_object;
 static Shader shader_obj, shader_light;
 
 static glm::vec3 light_color(1.0f, 1.0f, 1.0f);
-static glm::vec3 light_pos(1.2f, 1.0f, 2.0f);
+static glm::vec3 light_pos(1.2f, 0.0f, 2.0f);
 
 static struct {
     glm::vec3 pos, front, up;
@@ -28,7 +28,9 @@ static struct {
 } camera;
 
 static bool in_menu = false;
-static bool has_ambient = true, has_diffuse = true;
+static bool has_ambient = true, has_diffuse = true, has_specular = true;
+static float ambient_strength = 1.0f, specular_strength = 1.0f;
+static int specular_n = 5;
 
 static glm::vec3 vertices[][2] = {
     {{-0.5f, -0.5f, -0.5f}, {+0.0f, +0.0f, -1.0f}},
@@ -155,8 +157,6 @@ static void draw() {
     glBindVertexArray(vertex_array_object);
     shader_obj.use();
 
-    static float ambient_strength = 1.0f;
-
     glm::mat4 view =
         glm::lookAt(camera.pos, camera.pos + camera.front, camera.up);
 
@@ -168,6 +168,9 @@ static void draw() {
 
     shader_obj.set_bool("has_ambient"_s, has_ambient);
     shader_obj.set_bool("has_diffuse"_s, has_diffuse);
+    shader_obj.set_bool("has_specular"_s, has_specular);
+
+    shader_obj.set_vec3("camera_pos"_s, camera.pos);
 
     shader_obj.set_mat4("model"_s, model);
     shader_obj.set_mat4("projection"_s, projection);
@@ -177,6 +180,8 @@ static void draw() {
     shader_obj.set_vec3("light_pos"_s, light_pos);
     shader_obj.set_vec3("object_color"_s, color_coral);
     shader_obj.set_float("ambient_strength"_s, ambient_strength);
+    shader_obj.set_float("specular_strength"_s, specular_strength);
+    shader_obj.set_int("specular_n"_s, specular_n);
 
     glDrawArrays(GL_TRIANGLES, 0, 36);
 
@@ -202,8 +207,12 @@ static void draw() {
         ImGui::ColorEdit3("light color", (float *)&light_color);
         ImGui::SliderFloat("ambient strength light", &ambient_strength, 0.0f,
                            2.0f);
+        ImGui::SliderFloat("specular strength light", &specular_strength, 0.0f,
+                           2.0f);
+        ImGui::SliderInt("specular shininess value", &specular_n, 1, 30);
         ImGui::Selectable("has ambient light", &has_ambient);
         ImGui::Selectable("has diffuse light", &has_diffuse);
+        ImGui::Selectable("has specular light", &has_specular);
         ImGui::End();
 
         ImGui::EndFrame();
