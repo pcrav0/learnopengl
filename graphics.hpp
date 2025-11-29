@@ -42,6 +42,7 @@ struct Shader {
 
     GLint bind(const utils::String &name);
 
+    void set_bool(const utils::String &name, bool b);
     void set_int(const utils::String &name, int n);
     void set_float(const utils::String &name, float n);
 

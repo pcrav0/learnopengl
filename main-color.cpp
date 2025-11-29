@@ -19,6 +19,7 @@ static float acc = 0.0f, vel = 0.0f;
 static GLuint vertex_buffer_object, vertex_array_object;
 static Shader shader_obj, shader_light;
 
+static glm::vec3 light_color(1.0f, 1.0f, 1.0f);
 static glm::vec3 light_pos(1.2f, 1.0f, 2.0f);
 
 static struct {
@@ -27,55 +28,50 @@ static struct {
 } camera;
 
 static bool in_menu = false;
+static bool has_ambient = true, has_diffuse = true;
 
-static glm::vec3 vertices[] = {
-    // a
-    {-0.5f, -0.5f, -0.5f},
-    {0.5f, -0.5f, -0.5f},
-    {0.5f, 0.5f, -0.5f},
-    {0.5f, 0.5f, -0.5f},
-    {-0.5f, 0.5f, -0.5f},
-    {-0.5f, -0.5f, -0.5f},
+static glm::vec3 vertices[][2] = {
+    {{-0.5f, -0.5f, -0.5f}, {+0.0f, +0.0f, -1.0f}},
+    {{+0.5f, -0.5f, -0.5f}, {+0.0f, +0.0f, -1.0f}},
+    {{+0.5f, +0.5f, -0.5f}, {+0.0f, +0.0f, -1.0f}},
+    {{+0.5f, +0.5f, -0.5f}, {+0.0f, +0.0f, -1.0f}},
+    {{-0.5f, +0.5f, -0.5f}, {+0.0f, +0.0f, -1.0f}},
+    {{-0.5f, -0.5f, -0.5f}, {+0.0f, +0.0f, -1.0f}},
 
-    // b
-    {-0.5f, -0.5f, 0.5f},
-    {0.5f, -0.5f, 0.5f},
-    {0.5f, 0.5f, 0.5f},
-    {0.5f, 0.5f, 0.5f},
-    {-0.5f, 0.5f, 0.5f},
-    {-0.5f, -0.5f, 0.5f},
+    {{-0.5f, -0.5f, +0.5f}, {+0.0f, +0.0f, +1.0f}},
+    {{+0.5f, -0.5f, +0.5f}, {+0.0f, +0.0f, +1.0f}},
+    {{+0.5f, +0.5f, +0.5f}, {+0.0f, +0.0f, +1.0f}},
+    {{+0.5f, +0.5f, +0.5f}, {+0.0f, +0.0f, +1.0f}},
+    {{-0.5f, +0.5f, +0.5f}, {+0.0f, +0.0f, +1.0f}},
+    {{-0.5f, -0.5f, +0.5f}, {+0.0f, +0.0f, +1.0f}},
 
-    // c
-    {-0.5f, 0.5f, 0.5f},
-    {-0.5f, 0.5f, -0.5f},
-    {-0.5f, -0.5f, -0.5f},
-    {-0.5f, -0.5f, -0.5f},
-    {-0.5f, -0.5f, 0.5f},
-    {-0.5f, 0.5f, 0.5f},
+    {{-0.5f, +0.5f, +0.5f}, {-1.0, +0.0f, +0.0f}},
+    {{-0.5f, +0.5f, -0.5f}, {-1.0, +0.0f, +0.0f}},
+    {{-0.5f, -0.5f, -0.5f}, {-1.0, +0.0f, +0.0f}},
+    {{-0.5f, -0.5f, -0.5f}, {-1.0, +0.0f, +0.0f}},
+    {{-0.5f, -0.5f, +0.5f}, {-1.0, +0.0f, +0.0f}},
+    {{-0.5f, +0.5f, +0.5f}, {-1.0, +0.0f, +0.0f}},
 
-    // d
-    {0.5f, 0.5f, 0.5f},
-    {0.5f, 0.5f, -0.5f},
-    {0.5f, -0.5f, -0.5f},
-    {0.5f, -0.5f, -0.5f},
-    {0.5f, -0.5f, 0.5f},
-    {0.5f, 0.5f, 0.5f},
+    {{+0.5f, +0.5f, +0.5f}, {+1.0f, +0.0f, +0.0f}},
+    {{+0.5f, +0.5f, -0.5f}, {+1.0f, +0.0f, +0.0f}},
+    {{+0.5f, -0.5f, -0.5f}, {+1.0f, +0.0f, +0.0f}},
+    {{+0.5f, -0.5f, -0.5f}, {+1.0f, +0.0f, +0.0f}},
+    {{+0.5f, -0.5f, +0.5f}, {+1.0f, +0.0f, +0.0f}},
+    {{+0.5f, +0.5f, +0.5f}, {+1.0f, +0.0f, +0.0f}},
 
-    // e
-    {-0.5f, -0.5f, -0.5f},
-    {0.5f, -0.5f, -0.5f},
-    {0.5f, -0.5f, 0.5f},
-    {0.5f, -0.5f, 0.5f},
-    {-0.5f, -0.5f, 0.5f},
-    {-0.5f, -0.5f, -0.5f},
+    {{-0.5f, -0.5f, -0.5f}, {+0.0f, -1.0f, +0.0f}},
+    {{+0.5f, -0.5f, -0.5f}, {+0.0f, -1.0f, +0.0f}},
+    {{+0.5f, -0.5f, +0.5f}, {+0.0f, -1.0f, +0.0f}},
+    {{+0.5f, -0.5f, +0.5f}, {+0.0f, -1.0f, +0.0f}},
+    {{-0.5f, -0.5f, +0.5f}, {+0.0f, -1.0f, +0.0f}},
+    {{-0.5f, -0.5f, -0.5f}, {+0.0f, -1.0f, +0.0f}},
 
-    // f
-    {-0.5f, 0.5f, -0.5f},
-    {0.5f, 0.5f, -0.5f},
-    {0.5f, 0.5f, 0.5f},
-    {0.5f, 0.5f, 0.5f},
-    {-0.5f, 0.5f, 0.5f},
-    {-0.5f, 0.5f, -0.5f},
+    {{-0.5f, +0.5f, -0.5f}, {+0.0f, +1.0f, +0.0f}},
+    {{+0.5f, +0.5f, -0.5f}, {+0.0f, +1.0f, +0.0f}},
+    {{+0.5f, +0.5f, +0.5f}, {+0.0f, +1.0f, +0.0f}},
+    {{+0.5f, +0.5f, +0.5f}, {+0.0f, +1.0f, +0.0f}},
+    {{-0.5f, +0.5f, +0.5f}, {+0.0f, +1.0f, +0.0f}},
+    {{-0.5f, +0.5f, -0.5f}, {+0.0f, +1.0f, +0.0f}},
 };
 
 static bool update() {
@@ -125,6 +121,18 @@ static bool update() {
         camera.pos +=
             glm::normalize(glm::cross(camera.front, camera.up)) * camera_speed;
 
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        light_pos.x -= camera_speed;
+
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        light_pos.x += camera_speed;
+
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        light_pos.z -= camera_speed;
+
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        light_pos.z += camera_speed;
+
     if (glfwGetKey(window, GLFW_KEY_F2) == GLFW_PRESS) {
         glfwWaitEventsTimeout(1.5f);
         static int i = 0;
@@ -148,7 +156,6 @@ static void draw() {
     shader_obj.use();
 
     static float ambient_strength = 1.0f;
-    static auto light_color = glm::vec3(0.9f, 1.0f, 1.0f);
 
     glm::mat4 view =
         glm::lookAt(camera.pos, camera.pos + camera.front, camera.up);
@@ -159,12 +166,16 @@ static void draw() {
 
     glm::mat4 model = glm::mat4(1.0f);
 
+    shader_obj.set_bool("has_ambient"_s, has_ambient);
+    shader_obj.set_bool("has_diffuse"_s, has_diffuse);
+
     shader_obj.set_mat4("model"_s, model);
     shader_obj.set_mat4("projection"_s, projection);
     shader_obj.set_mat4("view"_s, view);
 
-    shader_obj.set_vec3("object_color"_s, color_coral);
     shader_obj.set_vec3("light_color"_s, light_color);
+    shader_obj.set_vec3("light_pos"_s, light_pos);
+    shader_obj.set_vec3("object_color"_s, color_coral);
     shader_obj.set_float("ambient_strength"_s, ambient_strength);
 
     glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -191,6 +202,8 @@ static void draw() {
         ImGui::ColorEdit3("light color", (float *)&light_color);
         ImGui::SliderFloat("ambient strength light", &ambient_strength, 0.0f,
                            2.0f);
+        ImGui::Selectable("has ambient light", &has_ambient);
+        ImGui::Selectable("has diffuse light", &has_diffuse);
         ImGui::End();
 
         ImGui::EndFrame();
@@ -229,9 +242,14 @@ int main() {
                      GL_STATIC_DRAW);
 
         // layout (location = 0) in vec3 pos;
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(glm::vec3),
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(vertices[0]),
                               (void *)0);
         glEnableVertexAttribArray(0);
+
+        // layout (location = 1) in vec3 normal;
+        glVertexAttribPointer(1, 3, GL_FLOAT, false, sizeof(vertices[0]),
+                              (void *)sizeof(glm::vec3));
+        glEnableVertexAttribArray(1);
     }
 
     glfwSetCursorPosCallback(window, [](GLFWwindow *window, double xpos,

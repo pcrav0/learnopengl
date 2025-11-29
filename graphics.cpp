@@ -68,6 +68,10 @@ GLint Shader::bind(const String &name) {
     return result;
 }
 
+void Shader::set_bool(const String &name, bool b) {
+    glUniform1i(bind(name), b);
+}
+
 void Shader::set_int(const String &name, int n) { glUniform1i(bind(name), n); }
 
 void Shader::set_float(const String &name, float n) {
