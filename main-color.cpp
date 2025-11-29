@@ -138,8 +138,6 @@ static bool update() {
     return true;
 }
 
-static float uniform_ambient_strength = 1.0f;
-
 static void draw() {
     DEFER[] { glfwSwapBuffers(window); };
 
@@ -148,6 +146,9 @@ static void draw() {
 
     glBindVertexArray(vertex_array_object);
     shader_obj.use();
+
+    static float ambient_strength = 1.0f;
+    static auto light_color = glm::vec3(0.9f, 1.0f, 1.0f);
 
     glm::mat4 view =
         glm::lookAt(camera.pos, camera.pos + camera.front, camera.up);
@@ -163,8 +164,8 @@ static void draw() {
     shader_obj.set_mat4("view"_s, view);
 
     shader_obj.set_vec3("object_color"_s, color_coral);
-    shader_obj.set_vec3("light_color"_s, glm::vec3(0.9f, 1.0f, 1.0f));
-    shader_obj.set_float("ambient_strength"_s, uniform_ambient_strength);
+    shader_obj.set_vec3("light_color"_s, light_color);
+    shader_obj.set_float("ambient_strength"_s, ambient_strength);
 
     glDrawArrays(GL_TRIANGLES, 0, 36);
 
@@ -187,8 +188,9 @@ static void draw() {
         ImGui::ShowDemoWindow();
 
         ImGui::Begin("config");
-        ImGui::SliderFloat("ambient strength light", &uniform_ambient_strength,
-                           0.0f, 1.0f);
+        ImGui::ColorEdit3("light color", (float *)&light_color);
+        ImGui::SliderFloat("ambient strength light", &ambient_strength, 0.0f,
+                           2.0f);
         ImGui::End();
 
         ImGui::EndFrame();
