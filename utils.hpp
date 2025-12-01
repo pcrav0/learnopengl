@@ -124,6 +124,10 @@ extern u64 random_state;
 
 UTILS_PROC f32 random_norm();
 UTILS_PROC ssize ptr_diff(void *a, void *b);
+
+UTILS_PROC void bitf_on(u8 *n, u8 index);
+UTILS_PROC void bitf_off(u8 *n, u8 index);
+UTILS_PROC void bitf_toggle(u8 *n, u8 index);
 };
 
 template <typename T> UTILS_PROC T min(T x) { return x; }
@@ -1524,6 +1528,10 @@ UTILS_PROC String file_read(const String &file_path, String_Builder<> &sb);
 namespace utils {
 Allocator *global_allocator = nullptr;
 u64 random_state = 1ULL << 31 | 1;
+
+UTILS_PROC void bitf_on(u8 *n, u8 index) { *n |= (1 << index); }
+UTILS_PROC void bitf_off(u8 *n, u8 index) { *n &= ~(1 << index); }
+UTILS_PROC void bitf_toggle(u8 *n, u8 index) { *n ^= (1 << index); }
 
 UTILS_PROC f32 random_norm() {
     u32 full = 0;

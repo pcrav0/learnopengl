@@ -14,6 +14,33 @@ int main() {
     Array<int, other_allocator> wowowowoo{};
 
     USE[] {
+        u8 n = 0;
+
+        bitf_on(&n, 0);
+        assert(n == 1);
+
+        bitf_on(&n, 1);
+        assert(n == 1 + 2);
+
+        bitf_on(&n, 2);
+        assert(n == 1 + 2 + 4);
+
+        bitf_on(&n, 3);
+        assert(n == 1 + 2 + 4 + 8);
+
+        bitf_off(&n, 0);
+        assert(n == 2 + 4 + 8);
+
+        bitf_off(&n, 2);
+        assert(n == 2 + 8);
+
+        bitf_toggle(&n, 0);
+        assert(n == 1 + 2 + 8);
+
+        bitf_toggle(&n, 0);
+        assert(n == 2 + 8);
+    };
+    USE[] {
         int *p = alloc<int>();
         assert(p != NULL);
         *p = 5;
