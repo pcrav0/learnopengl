@@ -1056,56 +1056,16 @@ struct Table : private Array<Pair<Key, Value>> {
     using Item = Pair<Key, Value>;
     using Base = Array<Item>;
     using Cmp = int (*)(const Item &a, const Item &b);
-
-    struct iterator {
-        Item *current;
-
-        UTILS_PROC_CONSTRUCT iterator(Item *ptr) : current(ptr) {}
-
-        UTILS_PROC bool operator==(const iterator &other) const {
-            return current == other.current || current == nullptr ||
-                   other.current == nullptr;
-        }
-
-        UTILS_PROC bool operator!=(const iterator &other) const {
-            return !(*this == other);
-        }
-
-        UTILS_PROC iterator &operator++() {
-            ++current;
-            return *this;
-        }
-
-        // UTILS_PROC iterator &operator++(Value) {
-        //     iterator result = *this;
-        //     ++(*this);
-        //     return result;
-        // }
-
-        UTILS_PROC iterator &operator--() {
-            --current;
-            return *this;
-        }
-
-        // UTILS_PROC iterator &operator--(Value) {
-        //     iterator result = *this;
-        //     --(*this);
-        //     return result;
-        // }
-
-        UTILS_PROC Item &operator*() { return *current; }
-        UTILS_PROC Item *operator->() { return current; }
-    };
-
-    using iterator_type = iterator;
-    using iterator_it_type = Item;
+    using iterator_type = Base::iterator_type;
+    using iterator_it_type = Base::iterator_it_type;
 
     UTILS_PROC static int cmp(const Item &a, const Item &b) {
         return a.key <=> b.key;
     }
 
-    UTILS_PROC iterator begin() { return iterator(&this->at(0)); }
-    UTILS_PROC iterator end() { return iterator(&this->at_raw(this->length)); }
+    UTILS_PROC Base::iterator_type begin() { return Base::begin(); }
+
+    UTILS_PROC Base::iterator_type end() { return Base::end(); }
 
     UTILS_PROC Table reserve(usize increment) {
         Base::reserve(increment);
