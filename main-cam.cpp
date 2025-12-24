@@ -192,9 +192,12 @@ static void update() {
 }
 
 static void draw() {
-    auto temp_allocator = Allocator_Ring<1024>();
-    context_allocator_push(&temp_allocator);
-    DEFER[] { context_allocator_destroy(); };
+    static auto draw_allocator = Allocator_Ring<1024>();
+    context_allocator_push(&draw_allocator);
+    DEFER[] {
+        context_allocator_reset();
+        context_allocator_pop();
+    };
 
     glClearColor((float)0x18 / 0xff, (float)0x18 / 0xff, (float)0x18 / 0xff,
                  1.0f);

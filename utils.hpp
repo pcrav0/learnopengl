@@ -135,8 +135,11 @@ UTILS_PROC void context_allocator_push(Allocator *allocator);
 UTILS_PROC Allocator *context_allocator_replace(Allocator *allocator);
 UTILS_PROC Allocator *context_allocator_pop();
 UTILS_PROC Allocator *context_allocator_peek();
-UTILS_PROC void context_allocator_reset();
+
+UTILS_PROC void context_allocator_create(Allocator &&allocator);
 UTILS_PROC void context_allocator_destroy();
+
+UTILS_PROC void context_allocator_reset();
 
 template <typename T> UTILS_PROC T min(T x) { return x; }
 
@@ -1646,10 +1649,11 @@ UTILS_PROC Allocator *context_allocator_peek() {
     return context_allocators[context_allocators_count - 1];
 }
 
-UTILS_PROC void context_allocator_reset() { context_allocator_peek()->reset(); }
 UTILS_PROC void context_allocator_destroy() {
     context_allocator_pop()->destroy();
 }
+
+UTILS_PROC void context_allocator_reset() { context_allocator_peek()->reset(); }
 
 UTILS_PROC_INIT void _context_allocator_init() {
     static auto allocator = Allocator_Malloc();
