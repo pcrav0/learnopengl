@@ -38,8 +38,7 @@ premake5 gmake
 
 ## release mode
 ``` sh
-make -f game.make verbose=true config=release -j$(nproc)
-./bin/release/main texture
+make -f game.make verbose=true config=release -j$(nproc); ./bin/release/main texture
 ```
 
 ## tests

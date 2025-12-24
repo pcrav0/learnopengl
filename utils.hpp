@@ -1237,24 +1237,6 @@ struct String_Builder {
     }
 };
 
-struct Allocator_Temp : public Allocator {
-    Allocator *allocator_ptr;
-
-    UTILS_PROC_DESTRUCT ~Allocator_Temp() {
-        destroy();
-        delete allocator_ptr;
-        delete this;
-    }
-
-    UTILS_PROC void *run(void *ptr, usize old_size, usize new_size) override {
-        return allocator_ptr->run(ptr, old_size, new_size);
-    }
-
-    UTILS_PROC void destroy() override { allocator_ptr->destroy(); }
-
-    UTILS_PROC void reset() override { allocator_ptr->reset(); }
-};
-
 template <usize N> struct Allocator_Static : public Allocator {
     Slice<u8> pool;
     usize used;
@@ -1553,12 +1535,6 @@ template <typename T> struct Shared {
 
     UTILS_PROC_DESTRUCT ~Shared() { control->destroy(); }
 };
-
-template <typename T> UTILS_PROC Allocator *create_temp_allocator(T allocator) {
-    Allocator_Temp *result = new Allocator_Temp;
-    result->allocator_ptr = new T(allocator);
-    return result;
-}
 
 UTILS_PROC String operator""_s(const char *chars, usize length);
 
