@@ -114,7 +114,7 @@ int main(void) {
     DEFER[] { glDeleteBuffers(1, &texture_vertex_buffer_object); };
     DEFER[] { glDeleteBuffers(1, &texture_element_buffer_object); };
 
-    String_Builder<> sb;
+    String_Builder sb;
 
     window = init("texture");
     DEFER[] { glfwTerminate(); };

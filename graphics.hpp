@@ -33,10 +33,10 @@ struct Shader {
 
     explicit Shader(const utils::String &vertex_shader_file_path,
                     const utils::String &fragment_shader_file_path,
-                    utils::String_Builder<> &sb);
+                    utils::String_Builder &sb);
 
     static void compile(utils::uint shader, const utils::String &file_path,
-                        utils::String_Builder<> &sb);
+                        utils::String_Builder &sb);
 
     void use();
 

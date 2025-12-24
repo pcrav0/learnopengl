@@ -115,8 +115,9 @@ void update() {
 }
 
 void draw() {
-    static Allocator *temp_allocator =
-        create_temp_allocator(Allocator_Ring<1024>());
+    auto draw_allocator = Allocator_Ring<1024>();
+    context_allocator_push(&draw_allocator);
+    DEFER[] { context_allocator_destroy(); };
 
     glClearColor((float)0x18 / 0xff, (float)0x18 / 0xff, (float)0x18 / 0xff,
                  1.0f);
@@ -127,7 +128,7 @@ void draw() {
 
     assert(textures.length <= 16);
     for (uint i = 0; i < textures.length; i++) {
-        String_Builder<temp_allocator> sb;
+        String_Builder sb;
         sb.start();
         sb.write("texture_"_s);
         sb.write('0' + i);
@@ -150,7 +151,7 @@ void draw() {
 }
 
 int main(void) {
-    String_Builder<> sb;
+    String_Builder sb;
 
     window = init("transformation");
     DEFER[] { glfwTerminate(); };
@@ -194,7 +195,7 @@ int main(void) {
     while (!glfwWindowShouldClose(window)) {
         update();
         draw();
-        global_allocator->reset();
+        context_allocator_reset();
     }
 
     glDeleteVertexArrays(1, &vertex_array_object);

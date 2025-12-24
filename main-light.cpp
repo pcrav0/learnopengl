@@ -32,6 +32,8 @@ static bool has_ambient = true, has_diffuse = true, has_specular = true;
 static float ambient_strength = 1.0f, specular_strength = 1.0f;
 static int specular_n = 5;
 
+static bool light_colors_time = true;
+
 static glm::vec3 vertices[][2] = {
     {{-0.5f, -0.5f, -0.5f}, {+0.0f, +0.0f, -1.0f}},
     {{+0.5f, -0.5f, -0.5f}, {+0.0f, +0.0f, -1.0f}},
@@ -145,9 +147,11 @@ static bool update() {
     glfwSetInputMode(window, GLFW_CURSOR,
                      in_menu ? GLFW_CURSOR_CAPTURED : GLFW_CURSOR_DISABLED);
 
-    light_color.x = sin(glfwGetTime() * 2.0f);
-    light_color.y = sin(glfwGetTime() * 0.7f);
-    light_color.z = sin(glfwGetTime() * 1.3f);
+    if (light_colors_time) {
+        light_color.x = sin(glfwGetTime() * 2.0f);
+        light_color.y = sin(glfwGetTime() * 0.7f);
+        light_color.z = sin(glfwGetTime() * 1.3f);
+    }
 
     return true;
 }
@@ -228,6 +232,8 @@ static void draw() {
         ImGui::Selectable("has ambient light", &has_ambient);
         ImGui::Selectable("has diffuse light", &has_diffuse);
         ImGui::Selectable("has specular light", &has_specular);
+
+        ImGui::Selectable("variable light color per time", &light_colors_time);
         ImGui::End();
 
         ImGui::EndFrame();
@@ -239,7 +245,7 @@ static void draw() {
 }
 
 int main() {
-    String_Builder<> sb;
+    String_Builder sb;
 
     window = init("color");
     DEFER[] { glfwTerminate(); };

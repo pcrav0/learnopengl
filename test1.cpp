@@ -9,18 +9,26 @@
 using namespace utils;
 
 int main() {
-    static Allocator *other_allocator;
-    UTILS_ALLOCATOR_INIT(other_allocator, Allocator_Ring<1024>);
-    Array<int, other_allocator> wowowowoo{};
+    static auto other_allocator = Allocator_Ring<1024>();
+    context_allocator_replace(&other_allocator)->destroy();
+    Array<int> wowowowoo{};
 
     USE[] {
         u8 n = 0;
 
+        assert(!bitf_get(&n, 0));
+
         bitf_on(&n, 0);
         assert(n == 1);
 
+        assert(bitf_get(&n, 0));
+
+        assert(!bitf_get(&n, 1));
+
         bitf_on(&n, 1);
         assert(n == 1 + 2);
+
+        assert(bitf_get(&n, 1));
 
         bitf_on(&n, 2);
         assert(n == 1 + 2 + 4);
@@ -34,11 +42,19 @@ int main() {
         bitf_off(&n, 2);
         assert(n == 2 + 8);
 
+        assert(!bitf_get(&n, 0));
         bitf_toggle(&n, 0);
         assert(n == 1 + 2 + 8);
 
+        assert(bitf_get(&n, 0));
         bitf_toggle(&n, 0);
         assert(n == 2 + 8);
+
+        bitf_set(&n, 1, false);
+        assert(n == 8);
+
+        bitf_set(&n, 0, true);
+        assert(n == 1 + 8);
     };
     USE[] {
         int *p = alloc<int>();
@@ -346,7 +362,7 @@ int main() {
             assert(l0[it.key] == it.value);
         }
 
-        // assert(l0.is_sorted());
+        assert(l0.to_array().is_sorted());
     };
     // USE[] {
     //     auto l0 = Table<String, int>();

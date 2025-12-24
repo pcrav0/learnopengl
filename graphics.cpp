@@ -13,7 +13,7 @@ using utils::String_Builder;
 Shader::Shader() : id(-1) {}
 
 Shader::Shader(const String &vertex_shader_file_path,
-               const String &fragment_shader_file_path, String_Builder<> &sb) {
+               const String &fragment_shader_file_path, String_Builder &sb) {
     uint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     DEFER[=] { glDeleteShader(vertex_shader); };
     compile(vertex_shader, vertex_shader_file_path, sb);
@@ -37,8 +37,7 @@ Shader::Shader(const String &vertex_shader_file_path,
     }
 }
 
-void Shader::compile(uint shader, const String &file_path,
-                     String_Builder<> &sb) {
+void Shader::compile(uint shader, const String &file_path, String_Builder &sb) {
     String source = file_read(file_path, sb);
 
     glShaderSource(shader, 1, &source.items,

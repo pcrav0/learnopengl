@@ -46,6 +46,10 @@
 #define UTILS_PROC_DESTRUCT UTILS_PROC virtual
 #endif
 
+#ifndef UTILS_MAX_CONTEXT_ALLOCATORS
+#define UTILS_MAX_CONTEXT_ALLOCATORS 8
+#endif
+
 #ifndef UTILS_ASSER
 #include <assert.h>
 #define UTILS_ASSERT(X) assert((X))
@@ -75,13 +79,6 @@
 
 #define UTILS_USE                                                              \
     utils::_Use UTILS_CONCAT(UTILS_CONCAT(__use__, __COUNTER__), __LINE__) =
-
-#define UTILS_ALLOCATOR_INIT(ALLOCATOR_PTR, ALLOCATOR_TYPE, ...)               \
-    ALLOCATOR_PTR = new ALLOCATOR_TYPE(__VA_ARGS__);                           \
-    DEFER[] {                                                                  \
-        ALLOCATOR_PTR->destroy();                                              \
-        delete ALLOCATOR_PTR;                                                  \
-    };
 
 #ifdef UTILS_MACRO_RENAME
 #define VA_ARGS_HEAD UTILS_VA_ARGS_HEAD
@@ -119,16 +116,27 @@ typedef uint64_t u64;
 typedef float f32;
 typedef double f64;
 
+struct Allocator;
+
 extern "C" {
 extern u64 random_state;
 
 UTILS_PROC f32 random_norm();
 UTILS_PROC ssize ptr_diff(void *a, void *b);
 
+UTILS_PROC bool bitf_get(const u8 *n, u8 index);
+UTILS_PROC void bitf_set(u8 *n, u8 index, bool bit);
 UTILS_PROC void bitf_on(u8 *n, u8 index);
 UTILS_PROC void bitf_off(u8 *n, u8 index);
 UTILS_PROC void bitf_toggle(u8 *n, u8 index);
 };
+
+UTILS_PROC void context_allocator_push(Allocator *allocator);
+UTILS_PROC Allocator *context_allocator_replace(Allocator *allocator);
+UTILS_PROC Allocator *context_allocator_pop();
+UTILS_PROC Allocator *context_allocator_peek();
+UTILS_PROC void context_allocator_reset();
+UTILS_PROC void context_allocator_destroy();
 
 template <typename T> UTILS_PROC T min(T x) { return x; }
 
@@ -278,17 +286,16 @@ struct Allocator {
     UTILS_PROC_DESTRUCT ~Allocator() {}
 };
 
-extern Allocator *global_allocator;
-
 template <typename T>
-UTILS_PROC T *alloc(uint count = 1, Allocator *allocator = global_allocator) {
+UTILS_PROC T *alloc(uint count = 1,
+                    Allocator *allocator = context_allocator_peek()) {
     UTILS_ASSERT(allocator != nullptr);
     return static_cast<T *>(allocator->run(nullptr, 0, sizeof(T) * count));
 }
 
 template <typename T>
 UTILS_PROC void dealloc(T *ptr, uint count,
-                        Allocator *allocator = global_allocator) {
+                        Allocator *allocator = context_allocator_peek()) {
     UTILS_ASSERT(allocator != nullptr);
     if (ptr == nullptr || count == 0)
         return;
@@ -297,7 +304,7 @@ UTILS_PROC void dealloc(T *ptr, uint count,
 
 template <typename T>
 UTILS_PROC T *realloc(T *ptr, uint old_count, uint new_count,
-                      Allocator *allocator = global_allocator) {
+                      Allocator *allocator = context_allocator_peek()) {
     UTILS_ASSERT(allocator != nullptr);
     return static_cast<T *>(
         allocator->run(ptr, sizeof(T) * old_count, sizeof(T) * new_count));
@@ -521,8 +528,7 @@ template <typename T> struct Slice {
     }
 };
 
-template <typename T, Allocator *&allocator = global_allocator>
-struct Array : public Slice<T> {
+template <typename T> struct Array : public Slice<T> {
     usize capacity;
 
     static constexpr usize init_capacity = (256 / sizeof(T)) > 0
@@ -541,7 +547,8 @@ struct Array : public Slice<T> {
         return Slice<T>(this->items, this->length);
     }
 
-    UTILS_PROC Array reserve(usize increment) {
+    UTILS_PROC Array reserve(usize increment,
+                             Allocator *allocator = context_allocator_peek()) {
         if (this->length + increment <= capacity)
             return *this;
 
@@ -555,9 +562,11 @@ struct Array : public Slice<T> {
         return *this;
     }
 
-    UTILS_PROC T &insert_reserve(usize index) {
+    UTILS_PROC T &
+    insert_reserve(usize index,
+                   Allocator *allocator = context_allocator_peek()) {
         UTILS_ASSERT(index <= this->length);
-        reserve(index + 1);
+        reserve(index + 1, allocator);
 
         this->length++;
         memset(&this->at(-1), 0, sizeof(T));
@@ -568,12 +577,14 @@ struct Array : public Slice<T> {
         return this->at_raw(index);
     }
 
-    UTILS_PROC Array insert(T item, usize index) {
-        insert_reserve(index) = item;
+    UTILS_PROC Array insert(T item, usize index,
+                            Allocator *allocator = context_allocator_peek()) {
+        insert_reserve(index, allocator) = item;
         return *this;
     }
 
-    UTILS_PROC T remove(ssize index) {
+    UTILS_PROC T remove(ssize index,
+                        Allocator *allocator = context_allocator_peek()) {
         T result = this->at(index);
 
         if (index < 0)
@@ -594,18 +605,32 @@ struct Array : public Slice<T> {
         return *this;
     }
 
-    UTILS_PROC Array push(T item) {
-        insert(item, this->length);
+    UTILS_PROC Array push(T item,
+                          Allocator *allocator = context_allocator_peek()) {
+        insert(item, this->length, allocator);
         return *this;
     }
-    UTILS_PROC T &push_reserve() { return insert_reserve(this->length); }
+    UTILS_PROC T &
+    push_reserve(Allocator *allocator = context_allocator_peek()) {
+        return insert_reserve(this->length, allocator);
+    }
 
-    UTILS_PROC T pop() { return remove(-1); }
+    UTILS_PROC T pop(Allocator *allocator = context_allocator_peek()) {
+        return remove(-1, allocator);
+    }
 
-    UTILS_PROC Array unshift(T item) { return insert(item, 0); }
-    UTILS_PROC T &unshift_reserve() { return insert_reserve(0); }
+    UTILS_PROC Array unshift(T item,
+                             Allocator *allocator = context_allocator_peek()) {
+        return insert(item, 0, allocator);
+    }
+    UTILS_PROC T &
+    unshift_reserve(Allocator *allocator = context_allocator_peek()) {
+        return insert_reserve(0, allocator);
+    }
 
-    UTILS_PROC T shift() { return remove(0); }
+    UTILS_PROC T shift(Allocator *allocator = context_allocator_peek()) {
+        return remove(0, allocator);
+    }
 
     UTILS_PROC Maybe<T *> search(T value) {
         for (usize i = 0; i < this->length; i++) {
@@ -620,7 +645,7 @@ struct Array : public Slice<T> {
     }
 };
 
-template <typename T, Allocator *&allocator = global_allocator> struct List {
+template <typename T> struct List {
     struct Node {
         T head = {};
         Node *tail = nullptr;
@@ -698,7 +723,8 @@ template <typename T, Allocator *&allocator = global_allocator> struct List {
         return *current;
     }
 
-    UTILS_PROC List append(T item) {
+    UTILS_PROC List append(T item,
+                           Allocator *allocator = context_allocator_peek()) {
         if (node == nullptr) {
             return prepend(item);
         }
@@ -713,7 +739,8 @@ template <typename T, Allocator *&allocator = global_allocator> struct List {
         return *this;
     }
 
-    UTILS_PROC List prepend(T item) {
+    UTILS_PROC List prepend(T item,
+                            Allocator *allocator = context_allocator_peek()) {
         Node *result = alloc<Node>(1, allocator);
         result->head = item;
         result->tail = node;
@@ -723,7 +750,8 @@ template <typename T, Allocator *&allocator = global_allocator> struct List {
         return *this;
     }
 
-    UTILS_PROC List remove(uint index) {
+    UTILS_PROC List remove(uint index,
+                           Allocator *allocator = context_allocator_peek()) {
         if (node == nullptr)
             return *this;
 
@@ -750,7 +778,7 @@ template <typename T, Allocator *&allocator = global_allocator> struct List {
     // TODO: List chain() {...} // create a cycle
 };
 
-template <typename T, Allocator *&allocator = global_allocator> struct Tree {
+template <typename T> struct Tree {
     struct Node {
         T head = {};
         Node *next = nullptr;
@@ -922,7 +950,8 @@ template <typename T, Allocator *&allocator = global_allocator> struct Tree {
         UTILS_UNREACHEBLE();
     }
 
-    UTILS_PROC Tree append_next(T item) {
+    UTILS_PROC Tree
+    append_next(T item, Allocator *allocator = context_allocator_peek()) {
         if (node == nullptr)
             prepend_next(item);
 
@@ -938,7 +967,8 @@ template <typename T, Allocator *&allocator = global_allocator> struct Tree {
         return *this;
     }
 
-    UTILS_PROC Tree append_prev(T item) {
+    UTILS_PROC Tree
+    append_prev(T item, Allocator *allocator = context_allocator_peek()) {
         if (node == nullptr)
             prepend_prev(item);
 
@@ -954,7 +984,8 @@ template <typename T, Allocator *&allocator = global_allocator> struct Tree {
         return *this;
     }
 
-    UTILS_PROC Tree prepend_next(T item) {
+    UTILS_PROC Tree
+    prepend_next(T item, Allocator *allocator = context_allocator_peek()) {
         Node *it = alloc<Node>(1, allocator);
 
         it->head = item;
@@ -969,7 +1000,8 @@ template <typename T, Allocator *&allocator = global_allocator> struct Tree {
         return *this;
     }
 
-    UTILS_PROC Tree prepend_prev(T item) {
+    UTILS_PROC Tree
+    prepend_prev(T item, Allocator *allocator = context_allocator_peek()) {
         Node *it = alloc<Node>(1, allocator);
 
         it->head = item;
@@ -984,7 +1016,8 @@ template <typename T, Allocator *&allocator = global_allocator> struct Tree {
         return *this;
     }
 
-    UTILS_PROC Node remove(int index = 0, int choose = 0) {
+    UTILS_PROC Node remove(int index = 0, int choose = 0,
+                           Allocator *allocator = context_allocator_peek()) {
         UTILS_ASSERT(node != nullptr);
 
         Node *to_remove = &at(index);
@@ -1015,16 +1048,11 @@ template <typename T, Allocator *&allocator = global_allocator> struct Tree {
     UTILS_PROC iterator end() { return iterator(&last_next()); }
 };
 
-template <typename Key, typename Value,
-          int (*cmp)(const void *, const void *) = [](const void *a,
-                                                      const void *b) -> int {
-              return static_cast<const Pair<Key, Value> *>(a)->key <=>
-                     static_cast<const Pair<Key, Value> *>(b)->key;
-          },
-          Allocator *&allocator = global_allocator>
-struct Table : private Array<Pair<Key, Value>, allocator> {
+template <typename Key, typename Value>
+struct Table : private Array<Pair<Key, Value>> {
     using Item = Pair<Key, Value>;
-    using Base = Array<Item, allocator>;
+    using Base = Array<Item>;
+    using Cmp = int (*)(const Item &a, const Item &b);
 
     struct iterator {
         Item *current;
@@ -1069,6 +1097,10 @@ struct Table : private Array<Pair<Key, Value>, allocator> {
     using iterator_type = iterator;
     using iterator_it_type = Item;
 
+    UTILS_PROC static int cmp(const Item &a, const Item &b) {
+        return a.key <=> b.key;
+    }
+
     UTILS_PROC iterator begin() { return iterator(&this->at(0)); }
     UTILS_PROC iterator end() { return iterator(&this->at_raw(this->length)); }
 
@@ -1098,7 +1130,8 @@ struct Table : private Array<Pair<Key, Value>, allocator> {
         return *this;
     }
 
-    UTILS_PROC Table put(std::initializer_list<Item> items) {
+    UTILS_PROC Table put(std::initializer_list<Item> items,
+                         Cmp cmp = Table::cmp) {
         reserve(this->length + items.size());
 
         for (const auto &item : items) {
@@ -1132,6 +1165,8 @@ struct Table : private Array<Pair<Key, Value>, allocator> {
         it->value = {};
         return it->value;
     }
+
+    UTILS_PROC Base to_array() { return *static_cast<Base *>(this); }
 };
 
 struct String : public Slice<char> {
@@ -1156,35 +1191,38 @@ struct String : public Slice<char> {
     };
 };
 
-template <Allocator *&allocator = global_allocator> struct String_Builder {
-    Array<char, allocator> chars;
-    Array<usize, allocator> control;
+struct String_Builder {
+    Array<char> chars;
+    Array<usize> control;
 
-    UTILS_PROC String_Builder write(char c) {
-        chars.push(c);
+    UTILS_PROC String_Builder
+    write(char c, Allocator *allocator = context_allocator_peek()) {
+        chars.push(c, allocator);
         return *this;
     }
 
-    UTILS_PROC String_Builder write(const String &string) {
-        chars.reserve(chars.length + string.length);
+    UTILS_PROC String_Builder write(
+        const String &string, Allocator *allocator = context_allocator_peek()) {
+        chars.reserve(chars.length + string.length, allocator);
         copy(string.items, &chars.at_raw(chars.length), string.length);
         chars.length += string.length;
 
         return *this;
     }
 
-    UTILS_PROC char *start() {
+    UTILS_PROC char *start(Allocator *allocator = context_allocator_peek()) {
         usize index = chars.length;
-        control.push(index);
+        control.push(index, allocator);
         return &chars.items[index];
     }
 
-    UTILS_PROC String end() {
-        usize offset = control.pop();
+    UTILS_PROC String end(Allocator *allocator = context_allocator_peek()) {
+        usize offset = control.pop(allocator);
         return String(chars.splice(offset, -1));
     }
 
-    UTILS_PROC String_Builder reset() {
+    UTILS_PROC String_Builder
+    reset(Allocator *allocator = context_allocator_peek()) {
         dealloc<char>(chars.items, chars.length, allocator);
         chars.items = nullptr;
         chars.length = 0;
@@ -1204,7 +1242,6 @@ struct Allocator_Temp : public Allocator {
 
     UTILS_PROC_DESTRUCT ~Allocator_Temp() {
         destroy();
-        // hfjsdah
         delete allocator_ptr;
         delete this;
     }
@@ -1381,7 +1418,7 @@ struct Allocator_Malloc : public Allocator {
     UTILS_PROC void reset() override { length = 0; }
 };
 
-template <typename T, Allocator *&allocator = global_allocator> struct Unique {
+template <typename T> struct Unique {
     T *ptr;
     usize ptr_count;
 
@@ -1409,7 +1446,7 @@ template <typename T, Allocator *&allocator = global_allocator> struct Unique {
     UTILS_PROC T operator*() { return *addr(); }
     UTILS_PROC T *operator->() { return addr(); }
 
-    UTILS_PROC void destroy() {
+    UTILS_PROC void destroy(Allocator *allocator = context_allocator_peek()) {
         if (ptr == nullptr || ptr_count == 0)
             return;
 
@@ -1422,7 +1459,7 @@ template <typename T, Allocator *&allocator = global_allocator> struct Unique {
     UTILS_PROC_DESTRUCT ~Unique() { destroy(); }
 };
 
-template <typename T, Allocator *&allocator = global_allocator> struct Shared {
+template <typename T> struct Shared {
     struct Control_Block {
         T *ptr;
         usize ptr_count;
@@ -1432,7 +1469,9 @@ template <typename T, Allocator *&allocator = global_allocator> struct Shared {
                                            uint *counter)
             : ptr(ptr), ptr_count(ptr_count), counter(counter) {}
 
-        UTILS_PROC_CONSTRUCT Control_Block(T *ptr, usize ptr_count)
+        UTILS_PROC_CONSTRUCT
+        Control_Block(T *ptr, usize ptr_count,
+                      Allocator *allocator = context_allocator_peek())
             : ptr(ptr), ptr_count(ptr_count),
               counter(alloc<uint>(1, allocator)) {
             *counter = 1;
@@ -1441,7 +1480,8 @@ template <typename T, Allocator *&allocator = global_allocator> struct Shared {
         UTILS_PROC uint inc() { return ++(*counter); }
         UTILS_PROC uint dec() { return --(*counter); }
 
-        UTILS_PROC void destroy() {
+        UTILS_PROC void
+        destroy(Allocator *allocator = context_allocator_peek()) {
             if (ptr == nullptr || ptr_count == 0 || counter == nullptr ||
                 *counter == 0)
                 return;
@@ -1461,12 +1501,14 @@ template <typename T, Allocator *&allocator = global_allocator> struct Shared {
 
     Control_Block *control;
 
-    UTILS_PROC_CONSTRUCT Shared(T *ptr, usize ptr_count)
+    UTILS_PROC_CONSTRUCT Shared(T *ptr, usize ptr_count,
+                                Allocator *allocator = context_allocator_peek())
         : control(alloc<Control_Block>(1, allocator)) {
         *control = Control_Block(ptr, ptr_count);
     }
 
-    UTILS_PROC_CONSTRUCT_COPY Shared(Shared &other)
+    UTILS_PROC_CONSTRUCT_COPY
+    Shared(Shared &other, Allocator *allocator = context_allocator_peek())
         : control(alloc<Control_Block>(1, allocator)) {
         *control = Control_Block(other.control->ptr, other.control->ptr_count,
                                  other.control->counter);
@@ -1521,14 +1563,24 @@ template <typename T> UTILS_PROC Allocator *create_temp_allocator(T allocator) {
 UTILS_PROC String operator""_s(const char *chars, usize length);
 
 UTILS_PROC String string_from_zstr(char *zstr);
-UTILS_PROC String file_read(const String &file_path, String_Builder<> &sb);
+UTILS_PROC String file_read(const String &file_path, String_Builder &sb);
 } // namespace utils
 
 #ifdef UTILS_IMPLEMENT
 namespace utils {
-Allocator *global_allocator = nullptr;
+
+Allocator *context_allocators[UTILS_MAX_CONTEXT_ALLOCATORS] = {0};
+usize context_allocators_count{};
+
 u64 random_state = 1ULL << 31 | 1;
 
+UTILS_PROC bool bitf_get(const u8 *n, u8 index) { return *n & (1 << index); }
+UTILS_PROC void bitf_set(u8 *n, u8 index, bool bit) {
+    if (bit)
+        bitf_on(n, index);
+    else
+        bitf_off(n, index);
+}
 UTILS_PROC void bitf_on(u8 *n, u8 index) { *n |= (1 << index); }
 UTILS_PROC void bitf_off(u8 *n, u8 index) { *n &= ~(1 << index); }
 UTILS_PROC void bitf_toggle(u8 *n, u8 index) { *n ^= (1 << index); }
@@ -1552,7 +1604,7 @@ UTILS_PROC ssize ptr_diff(void *a, void *b) {
     return reinterpret_cast<ssize>(a) - reinterpret_cast<ssize>(b);
 }
 
-UTILS_PROC String file_read(const String &path, String_Builder<> &sb) {
+UTILS_PROC String file_read(const String &path, String_Builder &sb) {
     FILE *file = fopen(path.temp_zstr(), "rb+");
     UTILS_DEFER[file] { fclose(file); };
 
@@ -1586,7 +1638,7 @@ UTILS_PROC String string_from_zstr(char *zstr) {
     return String(zstr, strlen(zstr));
 }
 
-UTILS_PROC char *zstr_from_string(const String &string, String_Builder<> sb) {
+UTILS_PROC char *zstr_from_string(const String &string, String_Builder sb) {
     char *result = sb.start();
     sb.write(string);
     sb.write('\0');
@@ -1594,13 +1646,44 @@ UTILS_PROC char *zstr_from_string(const String &string, String_Builder<> sb) {
     return result;
 }
 
-UTILS_PROC_INIT void _global_allocator_destroy_init() {
-    static auto _allocator = Allocator_Malloc();
-    global_allocator = &_allocator;
+UTILS_PROC void context_allocator_push(Allocator *allocator) {
+    assert(context_allocators_count <= UTILS_MAX_CONTEXT_ALLOCATORS);
+
+    context_allocators[context_allocators_count++] = allocator;
 }
 
-UTILS_PROC_FINI void _global_allocator_destroy_fini() {
-    global_allocator->destroy();
+UTILS_PROC Allocator *context_allocator_replace(Allocator *allocator) {
+    Allocator *result = context_allocators[context_allocators_count - 1];
+    context_allocators[context_allocators_count - 1] = allocator;
+    return result;
+}
+
+UTILS_PROC Allocator *context_allocator_pop() {
+    assert(context_allocators_count > 0);
+
+    return context_allocators[--context_allocators_count];
+}
+
+UTILS_PROC Allocator *context_allocator_peek() {
+    assert(context_allocators_count > 0);
+
+    return context_allocators[context_allocators_count - 1];
+}
+
+UTILS_PROC void context_allocator_reset() { context_allocator_peek()->reset(); }
+UTILS_PROC void context_allocator_destroy() {
+    context_allocator_pop()->destroy();
+}
+
+UTILS_PROC_INIT void _context_allocator_init() {
+    static auto allocator = Allocator_Malloc();
+
+    context_allocator_push(&allocator);
+}
+
+UTILS_PROC_FINI void _context_allocator_fini() {
+    while (context_allocators_count > 0)
+        context_allocator_pop()->destroy();
 }
 } // namespace utils
 #endif

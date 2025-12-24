@@ -44,8 +44,7 @@ make -f game.make verbose=true config=release -j$(nproc)
 
 ## tests
 ``` sh
-make -f test.make verbose=true config=test -j$(nproc)
-./bin/test/test
+make -f test.make verbose=true config=test -j$(nproc) && ./bin/test/test
 ```
 
 # credits
