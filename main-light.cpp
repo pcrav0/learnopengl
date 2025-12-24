@@ -17,7 +17,7 @@ static GLFWwindow *window;
 static float current_time, delta_time;
 static float acc = 0.0f, vel = 0.0f;
 static GLuint vertex_buffer_object, vertex_array_object;
-static Shader shader_obj, shader_light;
+static Shader shader_obj;
 
 static glm::vec3 light_color(1.0f, 1.0f, 1.0f);
 static glm::vec3 light_pos(1.2f, 0.0f, 2.0f);
@@ -200,17 +200,18 @@ static void draw() {
     shader_obj.set_vec3("material.diffuse"_s, {1.0f, 1.0f, 1.0f});
     shader_obj.set_vec3("material.specular"_s, {1.0f, 1.0f, 1.0f});
     shader_obj.set_float("material.shininess"_s, float(1 << specular_n));
+    shader_obj.set_bool("is_light_emitter"_s, false);
 
     glDrawArrays(GL_TRIANGLES, 0, 36);
 
-    shader_light.use();
     model = glm::translate(model, light_pos);
     model = glm::scale(model, glm::vec3(0.2f));
 
-    shader_light.set_mat4("model"_s, model);
-    shader_light.set_mat4("projection"_s, projection);
-    shader_light.set_mat4("view"_s, view);
-    shader_light.set_vec3("color"_s, light_color);
+    shader_obj.set_bool("is_light_emitter"_s, true);
+    shader_obj.set_mat4("model"_s, model);
+    shader_obj.set_mat4("projection"_s, projection);
+    shader_obj.set_mat4("view"_s, view);
+    shader_obj.set_vec3("object_color"_s, light_color);
 
     glDrawArrays(GL_TRIANGLES, 0, 36);
 
@@ -218,10 +219,10 @@ static void draw() {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-
-        ImGui::ShowDebugLogWindow();
-        ImGui::ShowDemoWindow();
-
+        if (false) {
+            ImGui::ShowDebugLogWindow();
+            ImGui::ShowDemoWindow();
+        }
         ImGui::Begin("config");
         ImGui::ColorEdit3("light color", (float *)&light_color);
         ImGui::SliderFloat("ambient strength light", &ambient_strength, 0.0f,
@@ -257,9 +258,6 @@ int main() {
 
     shader_obj = Shader("./assets/shaders/color-vertex.glsl"_s,
                         "./assets/shaders/color-fragment.glsl"_s, sb);
-
-    shader_light = Shader("./assets/shaders/color-vertex.glsl"_s,
-                          "./assets/shaders/color-light-fragment.glsl"_s, sb);
 
     {
         glGenBuffers(1, &vertex_buffer_object);

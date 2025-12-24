@@ -33,11 +33,17 @@ uniform vec3 object_color;
 uniform bool has_ambient;
 uniform bool has_diffuse;
 uniform bool has_specular;
+uniform bool is_light_emitter;
 
 uniform Light light;
 uniform Material material;
 
 void main() {
+    if (is_light_emitter) {
+        frag_result = vec4(object_color, 1.0);
+        return;
+    }
+
     vec3 result = vec3(0);
 
     vec3 normal = mat3(transpose(inverse(model))) * normal0;
