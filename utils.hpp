@@ -599,12 +599,22 @@ template <typename T> struct Array : public Slice<T> {
         return result;
     }
 
-    UTILS_PROC T &sorted_reserve(T item) {
-        return insert_reserve(this->sorted_index(item));
+    UTILS_PROC T &
+    sorted_reserve(T item, Allocator *allocator = context_allocator_peek()) {
+        return insert_reserve(this->sorted_index(item), allocator);
     }
 
-    UTILS_PROC Array sorted_insert(T item) {
-        sorted_reserve(item) = item;
+    UTILS_PROC Array
+    sorted_insert(T item, Allocator *allocator = context_allocator_peek()) {
+        sorted_reserve(item, allocator) = item;
+        return *this;
+    }
+
+    UTILS_PROC Array
+        if (!binary_search(item))
+            return *this;
+
+        remove(sorted_index(item), allocator);
         return *this;
     }
 
@@ -1049,6 +1059,28 @@ template <typename T> struct Tree {
 
     UTILS_PROC iterator begin() { return iterator(&last_prev()); }
     UTILS_PROC iterator end() { return iterator(&last_next()); }
+};
+
+template <typename T> struct Set : private Array<T> {
+    using Base = Array<T>;
+
+    UTILS_PROC Set add(T item) {
+        if (this->binary_search(item))
+            return *this;
+
+        this->sorted_insert(item);
+        return *this;
+    }
+
+    UTILS_PROC Set del(T item) {
+        if (!this->binary_search(item))
+            return *this;
+
+        this->sorted_remove(item);
+        return *this;
+    }
+
+    UTILS_PROC bool in(T item) { return this->binary_search(item).has; }
 };
 
 template <typename Key, typename Value>
