@@ -534,6 +534,8 @@ template <typename T> struct Slice {
 template <typename T> struct Array : public Slice<T> {
     usize capacity;
 
+    using Base = Slice<T>;
+
     static constexpr usize init_capacity = (256 / sizeof(T)) > 0
                                                ? (256 / sizeof(T))
                                                : 1;
@@ -547,40 +549,40 @@ template <typename T> struct Array : public Slice<T> {
     //     : items{const_cast<T *>(values.begin())}, length{values.size()} {}
 
     UTILS_PROC Slice<T> slice() const {
-        return Slice<T>(this->items, this->length);
+        return Slice<T>(Base::items, Base::length);
     }
 
     UTILS_PROC Array reserve(usize increment,
                              Allocator *allocator = context_allocator_peek()) {
-        if (this->length + increment <= capacity)
+        if (Base::length + increment <= capacity)
             return *this;
 
         usize old_size = capacity;
         if (capacity == 0)
             capacity = init_capacity;
-        while (this->length + increment > capacity)
+        while (Base::length + increment > capacity)
             capacity *= 2;
 
-        this->items = realloc<T>(this->items, old_size, capacity, allocator);
+        Base::items = realloc<T>(Base::items, old_size, capacity, allocator);
         return *this;
     }
 
     UTILS_PROC T &
     insert_reserve(usize index,
                    Allocator *allocator = context_allocator_peek()) {
-        UTILS_ASSERT(index <= this->length);
+        UTILS_ASSERT(index <= Base::length);
         reserve(index + 1, allocator);
 
-        this->length++;
-        memset(&this->at(-1), 0, sizeof(T));
+        Base::length++;
+        memset(&Base::at(-1), 0, sizeof(T));
 
-        if ((this->length - 1) != index)
-            this->splice(index, this->length).rotate(1);
+        if ((Base::length - 1) != index)
+            Base::splice(index, Base::length).rotate(1);
 
-        return this->at_raw(index);
+        return Base::at_raw(index);
     }
 
-    UTILS_PROC Array insert(T item, usize index,
+    UTILS_PROC Array insert(const T &item, usize index,
                             Allocator *allocator = context_allocator_peek()) {
         insert_reserve(index, allocator) = item;
         return *this;
@@ -588,29 +590,29 @@ template <typename T> struct Array : public Slice<T> {
 
     UTILS_PROC T remove(ssize index,
                         Allocator *allocator = context_allocator_peek()) {
-        T result = this->at(index);
+        T result = Base::at(index);
 
         if (index < 0)
-            index += this->length + 1;
+            index += Base::length + 1;
 
-        if (index != this->length)
-            this->splice(index, this->length).rotate(-2);
-        this->length--;
+        if (index != Base::length)
+            Base::splice(index, Base::length).rotate(-2);
+        Base::length--;
         return result;
     }
 
     UTILS_PROC T &
-    sorted_reserve(T item, Allocator *allocator = context_allocator_peek()) {
-        return insert_reserve(this->sorted_index(item), allocator);
+    sorted_reserve(const T &item, Allocator *allocator = context_allocator_peek()) {
+        return insert_reserve(Base::sorted_index(item), allocator);
     }
 
     UTILS_PROC Array
-    sorted_insert(T item, Allocator *allocator = context_allocator_peek()) {
+    sorted_insert(const T &item, Allocator *allocator = context_allocator_peek()) {
         sorted_reserve(item, allocator) = item;
         return *this;
     }
 
-    UTILS_PROC Array
+    UTILS_PROC Array sorted_remove(const T &item, Allocator *allocator = context_allocator_peek()) {
         if (!binary_search(item))
             return *this;
 
@@ -618,21 +620,21 @@ template <typename T> struct Array : public Slice<T> {
         return *this;
     }
 
-    UTILS_PROC Array push(T item,
+    UTILS_PROC Array push(const T &item,
                           Allocator *allocator = context_allocator_peek()) {
-        insert(item, this->length, allocator);
+        insert(item, Base::length, allocator);
         return *this;
     }
     UTILS_PROC T &
     push_reserve(Allocator *allocator = context_allocator_peek()) {
-        return insert_reserve(this->length, allocator);
+        return insert_reserve(Base::length, allocator);
     }
 
     UTILS_PROC T pop(Allocator *allocator = context_allocator_peek()) {
         return remove(-1, allocator);
     }
 
-    UTILS_PROC Array unshift(T item,
+    UTILS_PROC Array unshift(const T &item,
                              Allocator *allocator = context_allocator_peek()) {
         return insert(item, 0, allocator);
     }
@@ -645,9 +647,9 @@ template <typename T> struct Array : public Slice<T> {
         return remove(0, allocator);
     }
 
-    UTILS_PROC Maybe<T *> search(T value) {
-        for (usize i = 0; i < this->length; i++) {
-            T *it = &this->at(i);
+    UTILS_PROC Maybe<T *> search(const T &value) {
+        for (usize i = 0; i < Base::length; i++) {
+            T *it = &Base::at(i);
 
             if (it == value) {
                 return some(it);
@@ -698,7 +700,7 @@ template <typename T> struct List {
 
     UTILS_PROC_CONSTRUCT List(Node *node) : node{node} {}
 
-    UTILS_PROC List loop(auto f) const {
+    UTILS_PROC List loop(const auto &f) const {
         Node *current = node;
         while (current != nullptr) {
             if (!f(current))
@@ -736,7 +738,7 @@ template <typename T> struct List {
         return *current;
     }
 
-    UTILS_PROC List append(T item,
+    UTILS_PROC List append(const T &item,
                            Allocator *allocator = context_allocator_peek()) {
         if (node == nullptr) {
             return prepend(item);
@@ -752,7 +754,7 @@ template <typename T> struct List {
         return *this;
     }
 
-    UTILS_PROC List prepend(T item,
+    UTILS_PROC List prepend(const T &item,
                             Allocator *allocator = context_allocator_peek()) {
         Node *result = alloc<Node>(1, allocator);
         result->head = item;
@@ -846,7 +848,7 @@ template <typename T> struct Tree {
 
     UTILS_PROC_CONSTRUCT Tree(Node *node) : node{node} {}
 
-    UTILS_PROC Tree loop_next(auto f) const {
+    UTILS_PROC Tree loop_next(const auto &f) const {
         Node *current = node;
         while (current != nullptr) {
             if (!f(current))
@@ -857,7 +859,7 @@ template <typename T> struct Tree {
         return *this;
     }
 
-    UTILS_PROC Tree loop_prev(auto f) const {
+    UTILS_PROC Tree loop_prev(const auto &f) const {
         Node *current = node;
         while (current != nullptr) {
             if (!f(current))
@@ -964,7 +966,7 @@ template <typename T> struct Tree {
     }
 
     UTILS_PROC Tree
-    append_next(T item, Allocator *allocator = context_allocator_peek()) {
+    append_next(const T &item, Allocator *allocator = context_allocator_peek()) {
         if (node == nullptr)
             prepend_next(item);
 
@@ -981,7 +983,7 @@ template <typename T> struct Tree {
     }
 
     UTILS_PROC Tree
-    append_prev(T item, Allocator *allocator = context_allocator_peek()) {
+    append_prev(const T &item, Allocator *allocator = context_allocator_peek()) {
         if (node == nullptr)
             prepend_prev(item);
 
@@ -998,7 +1000,7 @@ template <typename T> struct Tree {
     }
 
     UTILS_PROC Tree
-    prepend_next(T item, Allocator *allocator = context_allocator_peek()) {
+    prepend_next(const T &item, Allocator *allocator = context_allocator_peek()) {
         Node *it = alloc<Node>(1, allocator);
 
         it->head = item;
@@ -1014,7 +1016,7 @@ template <typename T> struct Tree {
     }
 
     UTILS_PROC Tree
-    prepend_prev(T item, Allocator *allocator = context_allocator_peek()) {
+    prepend_prev(const T &item, Allocator *allocator = context_allocator_peek()) {
         Node *it = alloc<Node>(1, allocator);
 
         it->head = item;
@@ -1064,35 +1066,46 @@ template <typename T> struct Tree {
 template <typename T> struct Set : private Array<T> {
     using Base = Array<T>;
 
-    UTILS_PROC Set add(T item) {
-        if (this->binary_search(item))
+    UTILS_PROC Set add(const T &item) {
+        if (Base::binary_search(item))
             return *this;
 
-        this->sorted_insert(item);
+        Base::sorted_insert(item);
         return *this;
     }
 
-    UTILS_PROC Set del(T item) {
-        if (!this->binary_search(item))
+    UTILS_PROC Set del(const T &item) {
+        if (!Base::binary_search(item))
             return *this;
 
-        this->sorted_remove(item);
+        Base::sorted_remove(item);
         return *this;
     }
 
-    UTILS_PROC bool in(T item) { return this->binary_search(item).has; }
+    UTILS_PROC bool in(const T &item) { return Base::binary_search(item).has; }
+
+    UTILS_PROC Base::iterator begin() { return Base::begin(); }
+
+    UTILS_PROC Base::iterator end() { return Base::end(); }
+
+    UTILS_PROC Base to_array() { return *static_cast<Base*>(this); }
 };
 
 template <typename Key, typename Value>
 struct Table : private Array<Pair<Key, Value>> {
     using Item = Pair<Key, Value>;
     using Base = Array<Item>;
-    using Cmp = int (*)(const Item &a, const Item &b);
+    using Cmp = int (*)(const Key &a, const Key &b);
     using iterator_type = Base::iterator_type;
     using iterator_it_type = Base::iterator_it_type;
 
-    UTILS_PROC static int cmp(const Item &a, const Item &b) {
-        return a.key <=> b.key;
+    struct Opts {
+        Cmp cmp = Table::cmp;
+        Allocator *allocator = context_allocator_peek();
+    };
+
+    UTILS_PROC static int cmp(const Key &a, const Key &b) {
+        return a <=> b;
     }
 
     UTILS_PROC Base::iterator_type begin() { return Base::begin(); }
@@ -1104,58 +1117,65 @@ struct Table : private Array<Pair<Key, Value>> {
         return *this;
     }
 
-    UTILS_PROC Maybe<Item *> search(const Key &key) const {
-        for (usize i = 0; i < this->length; i++) {
-            Item *it = &this->at(i);
+    UTILS_PROC Maybe<Item *> search(const Key &key, Cmp cmp = Table::cmp) const {
+        usize low = 0, high = Base::length;
 
-            if (it->key == key) {
+        while (low < high) {
+            usize mid = (low + high) / 2;
+            Item *it = &Base::at(mid);
+            int c = cmp(it->key, key);
+
+            if (c == 0)
                 return some(it);
-            }
+
+            if (c < 0)
+                low = mid + 1;
+            else
+                high = mid;
         }
 
         return none<Item *>();
     }
 
-    UTILS_PROC Table put(Item item) {
-        if (auto it = search(item.key); it) {
+    UTILS_PROC Table put(const Item &item, Opts opts = {}) {
+        if (auto it = search(item.key, opts.cmp); it) {
             (*it)->value = item.value;
         }
 
-        this->sorted_insert(item);
+        Base::sorted_insert(item, opts.allocator);
         return *this;
     }
 
-    UTILS_PROC Table put(std::initializer_list<Item> items,
-                         Cmp cmp = Table::cmp) {
-        reserve(this->length + items.size());
+    UTILS_PROC Table put(std::initializer_list<const Item> items, Opts opts = {}) {
+        reserve(Base::length + items.size(), opts.allocator);
 
         for (const auto &item : items) {
-            if (auto it = search(item.key); it) {
+            if (auto it = search(item.key, opts.cmp); it) {
                 (*it)->value = item.value;
                 continue;
             }
 
-            this->push(item);
+            Base::push(item, opts.allocator);
         }
 
-        this->sort(cmp);
+        Base::sort(opts.cmp);
         return *this;
     }
 
-    UTILS_PROC Maybe<Value> get(const Key &key) const {
-        if (auto it = search(key); it) {
+    UTILS_PROC Maybe<Value> get(const Key &key, Cmp cmp = Table::cmp) const {
+        if (auto it = search(key, cmp); it) {
             return some((*it)->value);
         }
 
         return none<Value>();
     }
 
-    UTILS_PROC Value &operator[](const Key &key) {
-        if (auto it = search(key); it) {
+    UTILS_PROC Value &operator[](const Key &key, Opts opts = {}) {
+        if (auto it = search(key, opts.cmp); it) {
             return (*it)->value;
         }
 
-        Item *it = &this->sorted_reserve(Item(key, {}));
+        Item *it = &Base::sorted_reserve(Item(key, {}), opts.allocator);
         it->key = key;
         it->value = {};
         return it->value;
@@ -1165,6 +1185,7 @@ struct Table : private Array<Pair<Key, Value>> {
 };
 
 struct String : public Slice<char> {
+    using Base = Slice<char>;
     UTILS_PROC_CONSTRUCT String() : Slice() {}
     UTILS_PROC_CONSTRUCT String(Slice slice) : Slice(slice) {}
 
@@ -1172,15 +1193,15 @@ struct String : public Slice<char> {
         : Slice(chars, length) {}
 
     UTILS_PROC bool is_zstr() const {
-        return this->at(this->length + 1) == '\0';
+        return Base::at(Base::length + 1) == '\0';
     }
 
     UTILS_PROC char *temp_zstr() const {
         static char result[1024] = {0};
 
-        UTILS_ASSERT(this->length <= sizeof(result));
+        UTILS_ASSERT(Base::length <= sizeof(result));
         memset(result, 0, sizeof(result));
-        copy(this->items, result, this->length);
+        copy(Base::items, result, Base::length);
 
         return result;
     };
@@ -1438,62 +1459,41 @@ template <typename T> struct Unique {
 
 template <typename T> struct Shared {
     struct Control_Block {
-        T *ptr;
         usize ptr_count;
         uint *counter;
 
-        UTILS_PROC_CONSTRUCT Control_Block(T *ptr, usize ptr_count,
-                                           uint *counter)
-            : ptr(ptr), ptr_count(ptr_count), counter(counter) {}
+        UTILS_PROC_CONSTRUCT Control_Block(usize ptr_count, uint *counter)
+            : ptr_count(ptr_count), counter(counter) {}
 
         UTILS_PROC_CONSTRUCT
-        Control_Block(T *ptr, usize ptr_count,
-                      Allocator *allocator = context_allocator_peek())
-            : ptr(ptr), ptr_count(ptr_count),
-              counter(alloc<uint>(1, allocator)) {
+        Control_Block(usize ptr_count, Allocator *allocator = context_allocator_peek())
+            : ptr_count(ptr_count), counter(alloc<uint>(1, allocator)) {
             *counter = 1;
         }
 
         UTILS_PROC uint inc() { return ++(*counter); }
         UTILS_PROC uint dec() { return --(*counter); }
-
-        UTILS_PROC void
-        destroy(Allocator *allocator = context_allocator_peek()) {
-            if (ptr == nullptr || ptr_count == 0 || counter == nullptr ||
-                *counter == 0)
-                return;
-
-            if (dec() == 0) {
-                dealloc<T>(ptr, ptr_count, allocator);
-                ptr = nullptr;
-                ptr_count = 0;
-
-                dealloc<uint>(counter, 1, allocator);
-                counter = nullptr;
-
-                dealloc<Control_Block>(this, 1, allocator);
-            }
-        }
     };
 
-    Control_Block *control;
+    T *ptr = nullptr;
+    Control_Block *control = nullptr;
 
-    UTILS_PROC_CONSTRUCT Shared(T *ptr, usize ptr_count,
+    UTILS_PROC_CONSTRUCT Shared(T *ptr,
+                                usize ptr_count,
                                 Allocator *allocator = context_allocator_peek())
-        : control(alloc<Control_Block>(1, allocator)) {
-        *control = Control_Block(ptr, ptr_count);
+        : ptr(ptr), control(alloc<Control_Block>(1, allocator)) {
+        *control = Control_Block(ptr_count);
     }
 
     UTILS_PROC_CONSTRUCT_COPY
     Shared(Shared &other, Allocator *allocator = context_allocator_peek())
-        : control(alloc<Control_Block>(1, allocator)) {
-        *control = Control_Block(other.control->ptr, other.control->ptr_count,
-                                 other.control->counter);
+        : ptr(other.ptr), control(alloc<Control_Block>(1, allocator)) {
+        *control = Control_Block(other.control->ptr_count, other.control->counter);
         other.control->inc();
     }
 
     UTILS_PROC_CONSTRUCT_MOVE Shared(Shared &&other)
-        : control(Control_Block(other.control->ptr, other.control->ptr_count,
+        : ptr(other.ptr), control(Control_Block(other.control->ptr_count,
                                 other.control->count)) {
         other.control->destroy();
     }
@@ -1522,13 +1522,32 @@ template <typename T> struct Shared {
         return *this;
     }
 
-    UTILS_PROC T *addr() { return control->ptr; }
+
+    UTILS_PROC void destroy(Allocator *allocator = context_allocator_peek()) {
+        if (ptr == nullptr || control->ptr_count == 0 || control->counter == nullptr ||
+            *control->counter == 0)
+            return;
+
+        if (control->dec() == 0) {
+            dealloc<T>(ptr, 1, allocator);
+            ptr = nullptr;
+            control->ptr_count = 0;
+
+            dealloc<uint>(control->counter, 1, allocator);
+            control->counter = nullptr;
+
+            dealloc<Control_Block>(control, 1, allocator);
+        }
+    }
+
+
+    UTILS_PROC T *addr() { return ptr; }
     UTILS_PROC T operator*() { return *addr(); }
     UTILS_PROC T *operator->() { return addr(); }
 
     UTILS_PROC uint counter() { return *control->counter; }
 
-    UTILS_PROC_DESTRUCT ~Shared() { control->destroy(); }
+    UTILS_PROC_DESTRUCT ~Shared() { destroy(); }
 };
 
 UTILS_PROC String operator""_s(const char *chars, usize length);
