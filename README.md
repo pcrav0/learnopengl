@@ -1,3 +1,7 @@
+# learnopengl
+
+![img](./img.png)
+
 # libs
 - luajit 5.2
 - box2d.org
@@ -28,7 +32,7 @@ valgrind --tool=memcheck --leak-check=yes ./bin/debug/game
 # run
 ## generate the make files
 ``` sh
-premake5 gmake 
+premake5 gmake
 ```
 
 ## debug mode

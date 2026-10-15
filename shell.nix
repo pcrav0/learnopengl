@@ -2,6 +2,7 @@
 
 pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
+    premake5
     libGL
     glfw
 

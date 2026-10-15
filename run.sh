@@ -5,8 +5,11 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
+prefix=''
+type nixGL && prefix='nixGL'
+
 set -xe
 
 premake5 gmake
 time make CXX=clang++ -f game.make -j$(nproc) verbose=true config=debug "$1"
-./bin/debug/"$1"
+$prefix ./bin/debug/"$1"

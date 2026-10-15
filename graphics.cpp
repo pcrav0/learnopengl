@@ -157,7 +157,7 @@ GLFWwindow *init(const char *title, int width, int height) {
 
     assert(DEBUG);
 
-#if DEBUG
+#if false
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
     glDebugMessageCallback(
